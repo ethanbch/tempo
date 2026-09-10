@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:pricing": "node --experimental-strip-types scripts/verify-pricing.ts"
   },
   "dependencies": {
     "next": "16.3.4",
