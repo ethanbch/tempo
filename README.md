@@ -1,5 +1,7 @@
 # Tempo
 
+*(Read this document [in English](README.en.md).)*
+
 Tableau de bord local de ton usage de Claude Code : coût équivalent API, tokens,
 efficacité du cache, fenêtres de quota, répartition par modèle et par projet.
 
