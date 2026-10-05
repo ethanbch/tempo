@@ -13,13 +13,17 @@ import {
   timeAgo,
   usd,
 } from "@/lib/format";
+import { modelLabel } from "@/lib/pricing";
 import { modelSlot } from "@/lib/series";
+import type { RateLimits } from "@/lib/limits";
 import type { Account } from "@/lib/types";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { RankedBars } from "@/components/charts/RankedBars";
 import { StackedCost } from "@/components/charts/StackedCost";
 import { Levers } from "@/components/Levers";
 import { QuotaWindows } from "@/components/QuotaWindows";
+import { SessionDetail } from "@/components/SessionDetail";
+import { UsageLimits } from "@/components/UsageLimits";
 import { UsageTable } from "@/components/UsageTable";
 import { Card, ORDINAL_VARS, SERIES_VARS, StatTile } from "@/components/ui";
 
@@ -38,16 +42,22 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
 
 export function Dashboard({
   initialReport,
+  initialLimits,
   account,
 }: {
   initialReport: UsageReport;
+  initialLimits: RateLimits | null;
   account: Account;
 }) {
   const [report, setReport] = useState(initialReport);
+  const [limits, setLimits] = useState(initialLimits);
   const [range, setRange] = useState<RangeKey>(initialReport.range);
+  const [projectId, setProjectId] = useState<string>("");
+  const [model, setModel] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const inFlight = useRef<AbortController | null>(null);
   /** Horodatage du dernier appel terminé, qui borne la cadence réelle. */
   const lastFetchedAt = useRef<number>(Date.parse(initialReport.meta.generatedAt));
@@ -57,23 +67,33 @@ export function Dashboard({
   // diverger, et c'est la mesure du serveur qui fait foi.
   const now = Date.parse(report.meta.generatedAt);
 
-  /** Change de période et recharge, en annulant une requête encore en vol. */
-  async function selectRange(next: RangeKey) {
-    if (next === range) return;
+  function queryString(nextRange: RangeKey, nextProjectId: string, nextModel: string) {
+    const params = new URLSearchParams({ range: nextRange });
+    if (nextProjectId) params.set("project", nextProjectId);
+    if (nextModel) params.set("model", nextModel);
+    return params.toString();
+  }
 
+  /** Recharge avec la période et les filtres donnés, en annulant une requête encore en vol. */
+  async function reload(nextRange: RangeKey, nextProjectId: string, nextModel: string) {
     inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
 
-    setRange(next);
+    setRange(nextRange);
+    setProjectId(nextProjectId);
+    setModel(nextModel);
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/usage?range=${next}`, { signal: controller.signal });
+      const response = await fetch(`/api/usage?${queryString(nextRange, nextProjectId, nextModel)}`, {
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error(`réponse ${response.status}`);
-      const payload = (await response.json()) as { report: UsageReport };
+      const payload = (await response.json()) as { report: UsageReport; limits: RateLimits | null };
       setReport(payload.report);
+      setLimits(payload.limits);
     } catch (cause) {
       if (controller.signal.aborted) return;
       setError(cause instanceof Error ? cause.message : "erreur inconnue");
@@ -103,10 +123,18 @@ export function Dashboard({
       const controller = new AbortController();
       inFlight.current = controller;
       try {
-        const response = await fetch(`/api/usage?range=${range}`, { signal: controller.signal });
+        const response = await fetch(`/api/usage?${queryString(range, projectId, model)}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) return;
-        const payload = (await response.json()) as { report: UsageReport };
-        if (!cancelled) setReport(payload.report);
+        const payload = (await response.json()) as {
+          report: UsageReport;
+          limits: RateLimits | null;
+        };
+        if (!cancelled) {
+          setReport(payload.report);
+          setLimits(payload.limits);
+        }
       } catch {
         // Silencieux : le rendu précédent reste à l'écran.
       } finally {
@@ -132,7 +160,7 @@ export function Dashboard({
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [range]);
+  }, [range, projectId, model]);
 
   const { summary } = report;
   const models = report.byModel.map((model) => ({
@@ -211,35 +239,80 @@ export function Dashboard({
     ],
   }));
 
+  const sessions = report.bySession.slice(0, 8).map((session) => ({
+    key: session.sessionId,
+    label: session.projectName,
+    value: session.cost,
+    // Série nominale : une seule teinte, la longueur porte déjà la grandeur.
+    color: SERIES_VARS[0],
+    caption: `${integer(session.requests)} req · ${duration(session.durationMs)}`,
+    detail: [
+      { label: "Coût", value: usd(session.cost) },
+      { label: "Requêtes", value: integer(session.requests) },
+      { label: "Durée", value: duration(session.durationMs) },
+      { label: "Dernière activité", value: timeAgo(session.lastActivity, now) },
+    ],
+  }));
+
   return (
     <div className="mx-auto w-full max-w-[1140px] px-5 py-8 sm:px-8">
       <Header account={account} report={report} />
 
       {/* Les filtres tiennent sur une ligne, au-dessus de tout ce qu'ils cadrent. */}
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <div
-          role="group"
-          aria-label="Période"
-          className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
-        >
-          {RANGES.map((option) => {
-            const selected = option.key === range;
-            return (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => void selectRange(option.key)}
-                className={`rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
-                  selected
-                    ? "bg-[var(--accent)] font-medium text-white"
-                    : "text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            role="group"
+            aria-label="Période"
+            className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
+          >
+            {RANGES.map((option) => {
+              const selected = option.key === range;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => void reload(option.key, projectId, model)}
+                  className={`rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
+                    selected
+                      ? "bg-[var(--accent)] font-medium text-white"
+                      : "text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <select
+            aria-label="Filtrer par projet"
+            value={projectId}
+            onChange={(event) => void reload(range, event.target.value, model)}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
+          >
+            <option value="">Tous les projets</option>
+            {report.allProjects.map((project) => (
+              <option key={project.projectId} value={project.projectId}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Filtrer par modèle"
+            value={model}
+            onChange={(event) => void reload(range, projectId, event.target.value)}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
+          >
+            <option value="">Tous les modèles</option>
+            {report.allModels.map((id) => (
+              <option key={id} value={id}>
+                {modelLabel(id)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
@@ -267,6 +340,10 @@ export function Dashboard({
         className={`transition-opacity ${loading ? "opacity-50" : "opacity-100"}`}
         aria-busy={loading}
       >
+        <div className="mt-4">
+          <UsageLimits limits={limits} now={now} />
+        </div>
+
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
             label="Coût équivalent API"
@@ -324,6 +401,16 @@ export function Dashboard({
         </div>
 
         <div className="mt-4">
+          <Card title="Sessions" subtitle="Les huit sessions les plus coûteuses. Cliquer pour le détail.">
+            <RankedBars
+              items={sessions}
+              formatValue={(value) => usd(value)}
+              onSelect={setSelectedSessionId}
+            />
+          </Card>
+        </div>
+
+        <div className="mt-4">
           <Card
             title="Quand tu utilises Claude"
             subtitle="Requêtes par jour de la semaine et par heure, sur ton fuseau local."
@@ -377,7 +464,81 @@ export function Dashboard({
 
         <Footnotes report={report} />
       </div>
+
+      {selectedSessionId && (
+        <SessionDetail
+          key={selectedSessionId}
+          sessionId={selectedSessionId}
+          onClose={() => setSelectedSessionId(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Cycle : suit le système → clair → sombre → suit le système. */
+function nextTheme(current: "light" | "dark" | null): "light" | "dark" | null {
+  if (current === null) return "light";
+  if (current === "light") return "dark";
+  return null;
+}
+
+function ThemeToggle() {
+  // `null` (thème système) au premier rendu, des deux côtés : la préférence
+  // stockée n'est lue qu'au montage, pour ne jamais désaccorder le HTML
+  // serveur de la première passe client.
+  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
+
+  useEffect(() => {
+    // localStorage n'est lisible que côté client, après le montage : pas
+    // d'alternative synchrone compatible avec le rendu serveur ici.
+    const stored = window.localStorage.getItem("tempo-theme");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored === "light" || stored === "dark") setTheme(stored);
+  }, []);
+
+  function toggle() {
+    const next = nextTheme(theme);
+    setTheme(next);
+    if (next === null) {
+      document.documentElement.removeAttribute("data-theme");
+      window.localStorage.removeItem("tempo-theme");
+    } else {
+      document.documentElement.dataset.theme = next;
+      window.localStorage.setItem("tempo-theme", next);
+    }
+  }
+
+  const label =
+    theme === "light" ? "Thème clair" : theme === "dark" ? "Thème sombre" : "Thème du système";
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`${label}, changer de thème`}
+      title={label}
+      // La préférence stockée n'existe que côté client : l'icône du premier
+      // rendu serveur (thème système) peut différer de celle rendue au montage.
+      suppressHydrationWarning
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
+    >
+      {theme === "light" ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </svg>
+      ) : theme === "dark" ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M8 20h8M12 17v3" />
+        </svg>
+      )}
+    </button>
   );
 }
 
@@ -388,32 +549,48 @@ function Header({ account, report }: { account: Account; report: UsageReport }) 
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-lg text-[15px] font-semibold text-white"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
             style={{ background: "var(--accent)" }}
           >
-            ✳
+            <svg width="18" height="18" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M7 20.5H11.2L13.8 11L18.2 23L20.8 14.5H25"
+                stroke="#faf9f5"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </span>
-          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--ink)]">Tempo</h1>
+          <h1
+            className="text-[23px] font-semibold lowercase text-[var(--ink)]"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            tempo
+          </h1>
         </div>
         <p className="mt-1.5 text-[13px] text-[var(--ink-secondary)]">
           Ton usage de Claude Code, lu depuis les transcripts de ta machine.
         </p>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-right">
-        {account.missing ? (
-          <p className="text-[13px] text-[var(--ink-secondary)]">Aucun compte Claude détecté</p>
-        ) : (
-          <>
-            <p className="text-[13px] font-medium text-[var(--ink)]">{account.email}</p>
-            <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
-              {account.plan ? `Claude ${account.plan}` : "Compte Claude"}
-              {report.summary.lastActivity
-                ? ` · actif ${timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt))}`
-                : ""}
-            </p>
-          </>
-        )}
+      <div className="flex items-start gap-3">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-right">
+          {account.missing ? (
+            <p className="text-[13px] text-[var(--ink-secondary)]">Aucun compte Claude détecté</p>
+          ) : (
+            <>
+              <p className="text-[13px] font-medium text-[var(--ink)]">{account.email}</p>
+              <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
+                {account.plan ? `Claude ${account.plan}` : "Compte Claude"}
+                {report.summary.lastActivity
+                  ? ` · actif ${timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt))}`
+                  : ""}
+              </p>
+            </>
+          )}
+        </div>
+        <ThemeToggle />
       </div>
     </header>
   );
@@ -460,7 +637,8 @@ function Footnotes({ report }: { report: UsageReport }) {
       </p>
       <p>
         Aucune donnée ne quitte ta machine : l&apos;application lit les fichiers locaux et
-        n&apos;appelle aucun service distant. Durée d&apos;une fenêtre de quota :{" "}
+        n&apos;appelle aucun service distant. Les jauges de limite viennent du relevé déposé par
+        la statusline de Claude Code. Durée d&apos;une fenêtre de quota :{" "}
         {duration(5 * 60 * 60 * 1000)}.
       </p>
     </footer>

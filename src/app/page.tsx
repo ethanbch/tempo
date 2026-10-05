@@ -1,5 +1,6 @@
 import { readAccount } from "@/lib/account";
 import { buildReport } from "@/lib/aggregate";
+import { readRateLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
 import { Dashboard } from "@/components/Dashboard";
 
@@ -7,14 +8,18 @@ import { Dashboard } from "@/components/Dashboard";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const [scan, account] = await Promise.all([scanUsage(), readAccount()]);
+  const [scan, account, limits] = await Promise.all([
+    scanUsage(),
+    readAccount(),
+    readRateLimits(),
+  ]);
   const report = buildReport(scan, "7d");
 
   if (scan.fileCount === 0) {
     return <NoTranscripts root={scan.root} />;
   }
 
-  return <Dashboard initialReport={report} account={account} />;
+  return <Dashboard initialReport={report} initialLimits={limits} account={account} />;
 }
 
 function NoTranscripts({ root }: { root: string }) {

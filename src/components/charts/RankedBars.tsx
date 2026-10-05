@@ -54,12 +54,15 @@ export function RankedBars({
   formatValue,
   emptyMessage = "Aucune donnée sur cette période.",
   labelWidth = DEFAULT_LABEL_WIDTH,
+  onSelect,
 }: {
   items: RankedItem[];
   formatValue: (value: number) => string;
   emptyMessage?: string;
   /** Largeur de la gouttière d'étiquettes, à élargir quand les noms sont longs. */
   labelWidth?: number;
+  /** Rend chaque ligne activable, pour un drill-down par exemple. */
+  onSelect?: (key: string) => void;
 }) {
   const { ref, width } = useMeasure<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -92,7 +95,18 @@ export function RankedBars({
                 tabIndex={0}
                 role="button"
                 aria-label={`${item.label} : ${formatValue(item.value)}`}
-                className="outline-none"
+                className={`outline-none ${onSelect ? "cursor-pointer" : ""}`}
+                onClick={onSelect ? () => onSelect(item.key) : undefined}
+                onKeyDown={
+                  onSelect
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSelect(item.key);
+                        }
+                      }
+                    : undefined
+                }
                 onPointerMove={(event) => {
                   const box = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
                   setHovered(item.key);

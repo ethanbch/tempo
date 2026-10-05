@@ -16,9 +16,25 @@ export const viewport: Viewport = {
   ],
 };
 
+/**
+ * Pose `data-theme` avant l'hydratation, depuis la préférence stockée.
+ *
+ * Doit s'exécuter en tant que script bloquant dans `<head>`, pas dans un effet
+ * React qui arriverait trop tard et laisserait un flash du mauvais thème.
+ */
+const THEME_INIT_SCRIPT = `
+  try {
+    var t = localStorage.getItem("tempo-theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

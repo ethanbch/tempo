@@ -52,7 +52,7 @@ function addCost(parts: CostParts, event: UsageEvent, factor: number): void {
  * Une session encore ouverte n'a pas de `cost-state` : son facteur vaut 1 et son
  * coût est un plancher, signalé comme tel dans la réconciliation.
  */
-function buildCalibration(scan: ScanResult): Map<string, number> {
+export function buildCalibration(scan: ScanResult): Map<string, number> {
   const trackedBySession = new Map<string, number>();
   for (const event of scan.events) {
     trackedBySession.set(
@@ -136,6 +136,19 @@ export interface ProjectPoint extends TokenTotals {
   lastActivity: string;
 }
 
+export interface SessionPoint extends TokenTotals {
+  sessionId: string;
+  projectId: string;
+  projectName: string;
+  cost: number;
+  requests: number;
+  /** Modèle qui a servi le plus de requêtes dans cette session. */
+  dominantModel: string;
+  firstActivity: string;
+  lastActivity: string;
+  durationMs: number;
+}
+
 /** Une fenêtre de quota de 5 heures, ouverte par une requête après une pause. */
 export interface QuotaBlock extends TokenTotals {
   start: string;
@@ -194,6 +207,12 @@ export interface Summary extends TokenTotals {
   activeDays: number;
 }
 
+/** Un projet rencontré dans l'historique, pour peupler le filtre. */
+export interface ProjectOption {
+  projectId: string;
+  name: string;
+}
+
 export interface UsageReport {
   range: RangeKey;
   /**
@@ -202,12 +221,15 @@ export interface UsageReport {
    * même quand on change de période.
    */
   allModels: string[];
+  /** Tous les projets rencontrés dans l'historique complet, pour le filtre. */
+  allProjects: ProjectOption[];
   /** Borne basse de la période, ou null quand tout l'historique est retenu. */
   since: string | null;
   summary: Summary;
   daily: DailyPoint[];
   byModel: ModelPoint[];
   byProject: ProjectPoint[];
+  bySession: SessionPoint[];
   blocks: QuotaBlock[];
   heatmap: HeatCell[];
   /** Leviers d'optimisation dérivés des mêmes requêtes. */
@@ -300,20 +322,40 @@ function buildQuotaBlocks(
  * les appels qu'il ne journalise pas. `reconciliation` expose ce que vaut cet
  * ajustement et ce qui reste non calibré.
  */
+export interface ReportFilters {
+  projectId?: string;
+  model?: string;
+}
+
 export function buildReport(
   scan: ScanResult,
   range: RangeKey,
   now: number = Date.now(),
+  filters: ReportFilters = {},
 ): UsageReport {
   const since = range === "all" ? null : now - RANGE_DURATIONS[range];
-  const events = since === null ? scan.events : scan.events.filter((e) => e.time >= since);
-  const prompts = since === null ? scan.prompts : scan.prompts.filter((p) => p.time >= since);
+  let events = since === null ? scan.events : scan.events.filter((e) => e.time >= since);
+  // `prompts` n'a pas de champ modèle : un filtre modèle actif ne le réduit
+  // pas, seul le filtre projet s'y applique. Le compte de prompts reste donc
+  // une légère surestimation quand un modèle est sélectionné.
+  let prompts = since === null ? scan.prompts : scan.prompts.filter((p) => p.time >= since);
+
+  if (filters.projectId) {
+    events = events.filter((e) => e.projectId === filters.projectId);
+    prompts = prompts.filter((p) => p.projectId === filters.projectId);
+  }
+  if (filters.model) {
+    const wanted = canonicalModelId(filters.model);
+    events = events.filter((e) => canonicalModelId(e.model) === wanted);
+  }
 
   const totals = emptyTokens();
   const daily = new Map<string, DailyPoint>();
   const models = new Map<string, ModelPoint>();
   const projects = new Map<string, ProjectPoint>();
   const projectSessions = new Map<string, Set<string>>();
+  const sessionPoints = new Map<string, SessionPoint>();
+  const sessionModelRequests = new Map<string, Map<string, number>>();
   const heat = new Map<string, HeatCell>();
   const sessions = new Set<string>();
   const calibration = buildCalibration(scan);
@@ -383,6 +425,31 @@ export function buildReport(
     addCost(project.costParts, event, factor);
     projectSessions.get(event.projectId)?.add(event.sessionId);
 
+    let session = sessionPoints.get(event.sessionId);
+    if (!session) {
+      session = {
+        sessionId: event.sessionId,
+        projectId: event.projectId,
+        projectName: event.projectName,
+        cost: 0,
+        requests: 0,
+        dominantModel: modelId,
+        firstActivity: event.timestamp,
+        lastActivity: event.timestamp,
+        durationMs: 0,
+        ...emptyTokens(),
+      };
+      sessionPoints.set(event.sessionId, session);
+      sessionModelRequests.set(event.sessionId, new Map());
+    }
+    session.cost += cost;
+    session.requests += 1;
+    session.lastActivity = event.timestamp;
+    session.durationMs = event.time - Date.parse(session.firstActivity);
+    addEvent(session, event);
+    const modelCounts = sessionModelRequests.get(event.sessionId)!;
+    modelCounts.set(modelId, (modelCounts.get(modelId) ?? 0) + 1);
+
     const date = new Date(event.time);
     // `getDay()` place dimanche en 0 ; on décale pour une semaine lundi-dimanche.
     const weekday = (date.getDay() + 6) % 7;
@@ -401,6 +468,17 @@ export function buildReport(
     project.sessions = projectSessions.get(project.projectId)?.size ?? 0;
   }
 
+  for (const session of sessionPoints.values()) {
+    const modelCounts = sessionModelRequests.get(session.sessionId);
+    if (modelCounts) {
+      let best: [string, number] | null = null;
+      for (const entry of modelCounts) {
+        if (!best || entry[1] > best[1]) best = entry;
+      }
+      if (best) session.dominantModel = best[0];
+    }
+  }
+
   const relevantCosts = scan.sessionCosts.filter((cost) => sessions.has(cost.sessionId));
   const uncalibratedSessions = [...sessions].filter((id) => !calibration.has(id)).length;
 
@@ -414,9 +492,18 @@ export function buildReport(
 
   const allModels = [...new Set(scan.events.map((event) => canonicalModelId(event.model)))].sort();
 
+  const allProjectsMap = new Map<string, string>();
+  for (const event of scan.events) {
+    if (!allProjectsMap.has(event.projectId)) allProjectsMap.set(event.projectId, event.projectName);
+  }
+  const allProjects = [...allProjectsMap.entries()]
+    .map(([projectId, name]) => ({ projectId, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return {
     range,
     allModels,
+    allProjects,
     since: since === null ? null : new Date(since).toISOString(),
     summary: {
       ...totals,
@@ -436,6 +523,7 @@ export function buildReport(
     daily: dailyPoints,
     byModel: [...models.values()].sort((a, b) => b.cost - a.cost),
     byProject: [...projects.values()].sort((a, b) => b.cost - a.cost),
+    bySession: [...sessionPoints.values()].sort((a, b) => b.cost - a.cost),
     blocks: buildQuotaBlocks(events, now, factorFor),
     heatmap: [...heat.values()],
     insights: buildInsights(events, factorFor),

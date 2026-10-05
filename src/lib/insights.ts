@@ -114,6 +114,29 @@ function money(value: number): string {
 }
 
 /**
+ * Détermine la cause d'une écriture de cache, à partir de la requête précédente
+ * de la même session (`null` si c'est la première).
+ *
+ * Extrait pour être réutilisé tel quel par la vue de détail d'une session, qui
+ * annote chaque requête individuellement plutôt que d'agréger par cause.
+ */
+export function classifyCacheCause(
+  previous: UsageEvent | null,
+  event: UsageEvent,
+): RebuildCause {
+  if (!previous) return "session-start";
+
+  // Le cache écrit au tour précédent détermine la fenêtre de validité.
+  const ttl = previous.cacheWrite1hTokens > 0 ? CACHE_TTL_1H_MS : CACHE_TTL_5M_MS;
+  const gap = event.time - previous.time;
+
+  if (canonicalModelId(previous.model) !== canonicalModelId(event.model)) return "model-switch";
+  if (previous.effort !== event.effort) return "effort-switch";
+  if (gap > ttl) return "idle-timeout";
+  return "context-growth";
+}
+
+/**
  * Attribue chaque écriture de cache à sa cause, en rejouant chaque session.
  *
  * Une écriture de cache est du contexte qu'on paie à (ré)enregistrer. Dans une
@@ -153,25 +176,7 @@ function attributeCacheRebuilds(
 
       const cost = event.cost.cacheWrite * factorFor(event.sessionId);
       const previous = index > 0 ? session[index - 1] : null;
-
-      if (!previous) {
-        add("session-start", tokens, cost);
-        continue;
-      }
-
-      // Le cache écrit au tour précédent détermine la fenêtre de validité.
-      const ttl = previous.cacheWrite1hTokens > 0 ? CACHE_TTL_1H_MS : CACHE_TTL_5M_MS;
-      const gap = event.time - previous.time;
-
-      if (canonicalModelId(previous.model) !== canonicalModelId(event.model)) {
-        add("model-switch", tokens, cost);
-      } else if (previous.effort !== event.effort) {
-        add("effort-switch", tokens, cost);
-      } else if (gap > ttl) {
-        add("idle-timeout", tokens, cost);
-      } else {
-        add("context-growth", tokens, cost);
-      }
+      add(classifyCacheCause(previous, event), tokens, cost);
     }
   }
 
