@@ -385,9 +385,9 @@ of an unknown cap. For the actual percentage of your limits, see
 
 ## Design notes
 
-The interface is half clean product UI, half terminal: neutral surfaces, a
-single indigo accent, IBM Plex Sans for text and JetBrains Mono for figures,
-times and paths, segmented gauges echoing the statusline. Dark is the
+The interface uses neutral surfaces, a single indigo accent, IBM Plex Sans
+for text and JetBrains Mono for figures, times and paths, and segmented
+gauges matching the statusline. Dark is the
 reference theme; light gets the same care. Yellow and red are reserved for
 limit alerts, which is why the accent is cool.
 
