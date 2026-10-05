@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readAccount } from "@/lib/account";
 import { buildReport, isRangeKey, type RangeKey } from "@/lib/aggregate";
-import { readRateLimits } from "@/lib/limits";
+import { loadLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
 
 /** Le rapport dépend de fichiers locaux : rien ne doit être pré-rendu. */
@@ -16,11 +16,8 @@ export async function GET(request: Request) {
   const model = params.get("model") ?? undefined;
 
   try {
-    const [scan, account, limits] = await Promise.all([
-      scanUsage(),
-      readAccount(),
-      readRateLimits(),
-    ]);
+    const [scan, account] = await Promise.all([scanUsage(), readAccount()]);
+    const limits = await loadLimits(scan);
     return NextResponse.json(
       { account, limits, report: buildReport(scan, range, undefined, { projectId, model }) },
       { headers: { "cache-control": "no-store" } },

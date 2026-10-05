@@ -15,7 +15,7 @@ import {
 } from "@/lib/format";
 import { modelLabel } from "@/lib/pricing";
 import { modelSlot } from "@/lib/series";
-import type { RateLimits } from "@/lib/limits";
+import type { LimitsReport } from "@/lib/limits";
 import type { Account } from "@/lib/types";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { RankedBars } from "@/components/charts/RankedBars";
@@ -46,7 +46,7 @@ export function Dashboard({
   account,
 }: {
   initialReport: UsageReport;
-  initialLimits: RateLimits | null;
+  initialLimits: LimitsReport | null;
   account: Account;
 }) {
   const [report, setReport] = useState(initialReport);
@@ -91,7 +91,7 @@ export function Dashboard({
         signal: controller.signal,
       });
       if (!response.ok) throw new Error(`réponse ${response.status}`);
-      const payload = (await response.json()) as { report: UsageReport; limits: RateLimits | null };
+      const payload = (await response.json()) as { report: UsageReport; limits: LimitsReport | null };
       setReport(payload.report);
       setLimits(payload.limits);
     } catch (cause) {
@@ -129,7 +129,7 @@ export function Dashboard({
         if (!response.ok) return;
         const payload = (await response.json()) as {
           report: UsageReport;
-          limits: RateLimits | null;
+          limits: LimitsReport | null;
         };
         if (!cancelled) {
           setReport(payload.report);

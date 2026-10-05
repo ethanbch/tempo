@@ -5,6 +5,7 @@
 **A local dashboard for your Claude Code usage** — cost, tokens, cache
 efficiency, quota windows, and a breakdown by model and by project.
 
+[![CI](https://github.com/ethanbch/tempo/actions/workflows/ci.yml/badge.svg)](https://github.com/ethanbch/tempo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
@@ -85,13 +86,26 @@ each one resets.
 These numbers can't be derived from transcripts. Claude Code receives them
 from Anthropic and passes them to its statusline. Tempo ships a statusline
 script, `scripts/statusline.mjs`, that saves them to
-`~/.claude/tempo/rate-limits.json` for the dashboard to read. Tempo never
-touches your credentials and still makes no network call.
+`~/.claude/tempo/rate-limits.json` for the dashboard to read, and appends
+every change to `rate-limits-history.jsonl` next to it. Tempo never touches
+your credentials and still makes no network call.
 
 ### Setup
 
-Add a `statusLine` entry to `~/.claude/settings.json`, using the absolute
-path to your clone:
+From the Tempo folder:
+
+```bash
+npm run setup:statusline
+```
+
+The script adds the `statusLine` entry to `~/.claude/settings.json` without
+touching your other settings. If another statusline is already configured,
+it asks before replacing it, and sets it aside so that
+`npm run setup:statusline -- --remove` restores it. Use `-- --force` to
+replace it without asking (in a non-interactive shell, for instance).
+
+To do it by hand instead, add this entry to `~/.claude/settings.json`, using
+the absolute path to your clone:
 
 ```json
 {
@@ -103,8 +117,7 @@ path to your clone:
 ```
 
 If the file already has other settings, add `statusLine` as a new top-level
-key next to them (mind the comma after the previous entry). If you already
-use a statusline, this one replaces it.
+key next to them (mind the comma after the previous entry).
 
 Then send a message in any Claude Code session: the line appears at the
 bottom of the terminal, and the dashboard's gauges fill in on its next
@@ -114,6 +127,43 @@ the dashboard shows when the last reading was taken.
 The script runs on its own, even when the Tempo server is stopped — but it
 lives in your clone, so moving or deleting the `tempo` folder breaks the
 statusline.
+
+### Pace and projection
+
+Each gauge charts the current window from its opening to its reset: the
+readings as a solid line, and a dashed projection at your recent pace —
+measured over the last hour for the session, the last 24 hours for the week.
+The projection tells you either when you'll hit the limit, if that's before
+the reset, or roughly where you'll be when it resets. Until the history goes
+back far enough, the pace is the average since the window opened.
+
+### Estimated caps
+
+Anthropic doesn't publish what a Pro or Max limit amounts to. Tempo
+estimates it from your own history: for each past window, the API-equivalent
+cost of your Claude Code requests up to its highest reading, divided by the
+percentage reached. The median across windows gives "1 % ≈ $X" and the
+API-equivalent cost of a full window.
+
+Two caveats. Usage on claude.ai or on another machine counts toward the
+same limit but leaves no transcript here, so the real cap is then higher
+than the estimate. And the limits weigh models differently, so the figure
+shifts with your model mix. The estimate firms up as windows accumulate;
+windows used under 5 % are ignored, being too noisy.
+
+### Alerts
+
+When a session or the week crosses **80 %** or **95 %**, the statusline
+sends a desktop notification (macOS `osascript`, Linux `notify-send`) with
+the reset time. Each threshold fires once per window. To change the
+thresholds, or turn alerts off, set `TEMPO_ALERT_THRESHOLDS` in the
+statusline command:
+
+```json
+"command": "TEMPO_ALERT_THRESHOLDS=70,90 node /absolute/path/to/tempo/scripts/statusline.mjs"
+```
+
+(`TEMPO_ALERT_THRESHOLDS=off` disables them.)
 
 ### What the statusline shows
 
@@ -157,6 +207,17 @@ Distributing the factor rather than adding a flat markup keeps the charts
 consistent with the total, and keeps the period filter accurate. A session
 still open has no `cost-state` yet: its factor is 1 and its cost is a floor.
 The footer always shows what share of the total is calibrated.
+
+### Tests
+
+```bash
+npm test
+```
+
+The suite covers transcript parsing (a reply split over several lines,
+messages rewritten by a resumed session, lines still being written),
+calibration and 5-hour windows, the limit projections and cap estimates, and
+the statusline and setup scripts end to end, run against temporary files.
 
 ### Verifying the pricing
 
@@ -271,10 +332,12 @@ of an unknown cap. For the actual percentage of your limits, see
 | `src/lib/aggregate.ts` | Calibration and aggregations (day, model, project, window) |
 | `src/lib/insights.ts` | Optimization levers: cache-write attribution, effort, models |
 | `src/lib/series.ts` | Stable per-model color assignment |
-| `src/lib/limits.ts` | Reads the usage limits saved by the statusline |
+| `src/lib/limits.ts` | Usage limits: readings, pace projection, cap estimates |
 | `src/components/charts/` | Hand-written SVG charts |
 | `scripts/verify-pricing.ts` | Pricing verification against ground truth |
-| `scripts/statusline.mjs` | Claude Code statusline that saves usage limits for Tempo |
+| `scripts/statusline.mjs` | Claude Code statusline: saves usage limits, keeps their history, sends alerts |
+| `scripts/setup-statusline.mjs` | Installs or removes the statusline in Claude Code's settings |
+| `tests/` | Vitest suite |
 
 ## Configuration
 
@@ -282,7 +345,9 @@ of an unknown cap. For the actual percentage of your limits, see
 | --- | --- | --- |
 | `CLAUDE_PROJECTS_PATH` | `~/.claude/projects` | Where transcripts are read from |
 | `CLAUDE_CONFIG_PATH` | `~/.claude.json` | Where account info is read from |
-| `TEMPO_LIMITS_PATH` | `~/.claude/tempo/rate-limits.json` | Where usage limits are saved and read (set it for both the statusline and the server) |
+| `TEMPO_LIMITS_PATH` | `~/.claude/tempo/rate-limits.json` | Where usage limits are saved and read, history alongside (set it for both the statusline and the server) |
+| `TEMPO_ALERT_THRESHOLDS` | `80,95` | Statusline alert thresholds, in %, or `off` |
+| `CLAUDE_SETTINGS_PATH` | `~/.claude/settings.json` | Settings file edited by `setup:statusline` |
 
 ## Design notes
 
