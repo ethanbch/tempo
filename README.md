@@ -23,6 +23,7 @@ Claude Code sessions actually cost, without sending anything anywhere.
 - [Why Tempo](#why-tempo)
 - [100% local — no data ever leaves your machine](#100-local--no-data-ever-leaves-your-machine)
 - [Getting started](#getting-started)
+- [Usage limit gauges and statusline](#usage-limit-gauges-and-statusline)
 - [What the cost number means](#what-the-cost-number-means)
 - [Refresh strategy](#refresh-strategy)
 - [Optimization levers](#optimization-levers)
@@ -50,6 +51,9 @@ screen and no account to create:
   `~/.claude/projects/**/*.jsonl`.
 - It reads your account info from `~/.claude.json`, the config file Claude
   Code itself maintains.
+- It reads your usage limits from `~/.claude/tempo/rate-limits.json`, a file
+  written by Tempo's statusline script (see
+  [below](#usage-limit-gauges-and-statusline)).
 - The only network request involved is your browser talking to the server
   running on your own machine. Nothing is sent to Anthropic, to Tempo's
   author, or to anyone else.
@@ -68,6 +72,64 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). That's it — as long as
 you've used Claude Code on this machine, Tempo will find its transcripts.
+
+To also get the session and weekly usage gauges, set up the statusline
+below.
+
+## Usage limit gauges and statusline
+
+The dashboard can show the same percentages as Claude Code's `/usage`: how
+much of your **5-hour session** and of your **week** you've used, and when
+each one resets.
+
+These numbers can't be derived from transcripts. Claude Code receives them
+from Anthropic and passes them to its statusline. Tempo ships a statusline
+script, `scripts/statusline.mjs`, that saves them to
+`~/.claude/tempo/rate-limits.json` for the dashboard to read. Tempo never
+touches your credentials and still makes no network call.
+
+### Setup
+
+Add a `statusLine` entry to `~/.claude/settings.json`, using the absolute
+path to your clone:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node /absolute/path/to/tempo/scripts/statusline.mjs"
+  }
+}
+```
+
+If the file already has other settings, add `statusLine` as a new top-level
+key next to them (mind the comma after the previous entry). If you already
+use a statusline, this one replaces it.
+
+Then send a message in any Claude Code session: the line appears at the
+bottom of the terminal, and the dashboard's gauges fill in on its next
+refresh. The figures only update while a Claude Code session is running;
+the dashboard shows when the last reading was taken.
+
+The script runs on its own, even when the Tempo server is stopped — but it
+lives in your clone, so moving or deleting the `tempo` folder breaks the
+statusline.
+
+### What the statusline shows
+
+```
+✻ Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52 %  ·  5h ▰▱▱▱▱▱▱▱ 6 % ↻ 18h40  ·  7j ▰▰▰▱▱▱▱▱ 35 % ↻ 3j14h10m
+```
+
+| Block | Meaning |
+| --- | --- |
+| `✻ Opus 5.5 ◔ medium` | Model and effort level (`○` low → `●` max); `⚡` when fast mode is on |
+| `tempo ⎇ main ●` | Folder and git branch; `●` for uncommitted changes, `↑`/`↓` for commits ahead/behind the remote |
+| `ctx` | Context window used — turns yellow at 60 %, red at 80 % |
+| `5h` | 5-hour session used, and the time it resets |
+| `7j` | Week used, and the time left until it resets |
+
+Session and week gauges turn yellow at 70 % and red at 90 %.
 
 ## What the cost number means
 
@@ -195,9 +257,10 @@ Claude's quota recharges on a rolling window opened by the first request
 after a pause. Tempo replays that rule over your history.
 
 Anthropic doesn't publish a numeric token cap for Pro and Max, and making
-one up would produce a false gauge. So the gauge reads **relative to your
+one up would produce a false gauge. So this gauge reads **relative to your
 busiest window** instead: a measurable comparison, rather than a percentage
-of an unknown cap.
+of an unknown cap. For the actual percentage of your limits, see
+[the usage limit gauges](#usage-limit-gauges-and-statusline).
 
 ## Project structure
 
@@ -208,8 +271,10 @@ of an unknown cap.
 | `src/lib/aggregate.ts` | Calibration and aggregations (day, model, project, window) |
 | `src/lib/insights.ts` | Optimization levers: cache-write attribution, effort, models |
 | `src/lib/series.ts` | Stable per-model color assignment |
+| `src/lib/limits.ts` | Reads the usage limits saved by the statusline |
 | `src/components/charts/` | Hand-written SVG charts |
 | `scripts/verify-pricing.ts` | Pricing verification against ground truth |
+| `scripts/statusline.mjs` | Claude Code statusline that saves usage limits for Tempo |
 
 ## Configuration
 
@@ -217,6 +282,7 @@ of an unknown cap.
 | --- | --- | --- |
 | `CLAUDE_PROJECTS_PATH` | `~/.claude/projects` | Where transcripts are read from |
 | `CLAUDE_CONFIG_PATH` | `~/.claude.json` | Where account info is read from |
+| `TEMPO_LIMITS_PATH` | `~/.claude/tempo/rate-limits.json` | Where usage limits are saved and read (set it for both the statusline and the server) |
 
 ## Design notes
 
