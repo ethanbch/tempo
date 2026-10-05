@@ -139,6 +139,35 @@ export const es: Messages = {
 
   effortUnspecified: "sin especificar",
 
+  tabs: {
+    label: "Secciones",
+    overview: "Resumen",
+    spend: "Gasto",
+    activity: "Actividad",
+    optimize: "Optimización",
+  },
+
+  overview: {
+    costLabel: (period) => `Equivalente en API · ${period}`,
+    teaser: (count, amount) =>
+      `${count} palanca${count > 1 ? "s" : ""} de optimización · ${amount} de sobrecoste evitable`,
+    teaserTradeoffs: (count) => `${count} compromiso${count > 1 ? "s" : ""} a considerar`,
+    nothing: "Nada que optimizar en este periodo",
+    see: "Ver",
+    limitsDetail: "Detalle",
+    dailyMax: (value) => `máx. ${value}`,
+    vsPrevious: "vs periodo anterior",
+    noPrevious: "sin actividad en el periodo anterior",
+    avgPerDay: "Media por día activo",
+    peakDay: "Día más costoso",
+  },
+
+  method: {
+    open: "Cómo se calcula",
+    title: "Cómo se calcula",
+    info: "Explicación",
+  },
+
   limits: {
     title: "Límites de uso",
     subtitle:

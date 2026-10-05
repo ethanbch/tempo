@@ -146,6 +146,35 @@ export const fr = {
 
   effortUnspecified: "non précisé",
 
+  tabs: {
+    label: "Sections",
+    overview: "Vue d'ensemble",
+    spend: "Dépenses",
+    activity: "Activité",
+    optimize: "Optimisation",
+  },
+
+  overview: {
+    costLabel: (period: string) => `Équivalent API · ${period}`,
+    teaser: (count: number, amount: string) =>
+      `${count} levier${count > 1 ? "s" : ""} d'optimisation · ${amount} de surcoût évitable`,
+    teaserTradeoffs: (count: number) => `${count} arbitrage${count > 1 ? "s" : ""} à considérer`,
+    nothing: "Rien à optimiser sur cette période",
+    see: "Voir",
+    limitsDetail: "Détail",
+    dailyMax: (value: string) => `max ${value}`,
+    vsPrevious: "vs période précédente",
+    noPrevious: "aucune activité sur la période précédente",
+    avgPerDay: "Moyenne par jour actif",
+    peakDay: "Jour le plus coûteux",
+  },
+
+  method: {
+    open: "Comment c'est calculé",
+    title: "Comment c'est calculé",
+    info: "Explication",
+  },
+
   limits: {
     title: "Limites d'usage",
     subtitle:

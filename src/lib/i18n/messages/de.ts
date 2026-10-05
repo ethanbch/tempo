@@ -139,6 +139,35 @@ export const de: Messages = {
 
   effortUnspecified: "nicht angegeben",
 
+  tabs: {
+    label: "Bereiche",
+    overview: "Übersicht",
+    spend: "Ausgaben",
+    activity: "Aktivität",
+    optimize: "Optimierung",
+  },
+
+  overview: {
+    costLabel: (period) => `API-Gegenwert · ${period}`,
+    teaser: (count, amount) =>
+      `${count} Optimierungshebel · ${amount} vermeidbare Mehrkosten`,
+    teaserTradeoffs: (count) => `${count} Abwägung${count > 1 ? "en" : ""} zu prüfen`,
+    nothing: "In diesem Zeitraum gibt es nichts zu optimieren",
+    see: "Ansehen",
+    limitsDetail: "Details",
+    dailyMax: (value) => `max. ${value}`,
+    vsPrevious: "ggü. Vorperiode",
+    noPrevious: "keine Aktivität in der Vorperiode",
+    avgPerDay: "Schnitt pro aktivem Tag",
+    peakDay: "Teuerster Tag",
+  },
+
+  method: {
+    open: "So wird gerechnet",
+    title: "So wird gerechnet",
+    info: "Erklärung",
+  },
+
   limits: {
     title: "Nutzungslimits",
     subtitle:

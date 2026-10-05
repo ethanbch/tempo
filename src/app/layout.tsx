@@ -1,9 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 
 import { getMessages } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 import "./globals.css";
+
+/** Texte courant : un sans-serif technique et lisible en petit corps. */
+const plex = IBM_Plex_Sans({
+  subsets: ["latin"],
+  variable: "--font-plex",
+  display: "swap",
+});
+
+/** Chiffres, repères et logo : la police mono porte l'identité terminal. */
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const { meta } = getMessages(await getRequestLocale());
@@ -13,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   // La page s'adapte aux deux thèmes ; la barre du navigateur suit la surface.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf9f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#1f1e1d" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f6f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#111213" },
   ],
 };
 
@@ -36,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     // Le script de thème modifie `data-theme` avant l'hydratation : l'écart avec
     // le rendu serveur est voulu, on le signale à React.
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} className={`${plex.variable} ${jetbrains.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

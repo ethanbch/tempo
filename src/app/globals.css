@@ -1,128 +1,144 @@
 @import "tailwindcss";
 
 /*
- * Thème inspiré de Claude : fond crème chaud, encre charbon, accent argile.
+ * Thème Tempo : surfaces neutres légèrement froides, accent indigo, sombre
+ * d'abord dans l'esprit d'un instrument de terminal.
  *
  * La palette catégorielle a été validée avec le validateur de la méthode dataviz
- * contre les surfaces réelles de l'application (#faf9f5 en clair, #262624 en
- * sombre) : bande de clarté, plancher de chroma, séparation daltonisme et
- * contraste passent dans les deux modes. Deux teintes claires (aqua, jaune)
+ * contre les surfaces réelles (#ffffff en clair, #191a1c en sombre) : bande de
+ * clarté, plancher de chroma, séparation daltonisme et contraste passent dans
+ * les deux modes, sur les paires adjacentes. Deux teintes claires (aqua, rose)
  * passent sous 3:1 en mode clair : la vue tableau et les étiquettes directes
- * sont la compensation obligatoire, elles ne sont pas optionnelles.
+ * sont la compensation obligatoire. Le cinquième emplacement, gris, regroupe
+ * les modèles au-delà du quatrième : c'est le « reste », pas une série de plus.
+ *
+ * Les couleurs de statut (jaune, rouge) restent réservées aux alertes de
+ * limite ; l'accent froid les laisse se détacher.
  */
 
 :root {
   color-scheme: light;
 
   /* Surfaces et encres */
-  --page: #faf9f5;
+  --page: #f6f6f4;
   --surface: #ffffff;
-  --surface-sunken: #f4f2ec;
-  --surface-hover: #f0eee6;
-  --ink: #141413;
-  --ink-secondary: #52514e;
-  --ink-muted: #83827d;
-  --border: #e6e3da;
-  --border-strong: #d5d1c5;
-  --accent: #c15f3c;
-  --accent-hover: #a94f30;
-  --accent-wash: #f6ece7;
+  --surface-sunken: #f1f1ee;
+  --surface-hover: #ececea;
+  --ink: #1b1c1d;
+  --ink-secondary: #504f4a;
+  --ink-muted: #6e6d67;
+  --border: #e6e5e1;
+  --border-strong: #d6d5d0;
+  --accent: #4f56d6;
+  --accent-hover: #3f45bd;
+  --accent-wash: #ecedfb;
+  --on-accent: #ffffff;
 
   /* Chrome de graphique */
-  --grid: #e6e3da;
-  --axis: #d5d1c5;
+  --grid: #ecebe7;
+  --axis: #d6d5d0;
 
   /* Palette catégorielle — ordre figé, jamais recyclé */
-  --series-1: #c15f3c;
-  --series-2: #2a78d6;
-  --series-3: #1baf7a;
-  --series-4: #4a3aa7;
-  --series-5: #eda100;
+  --series-1: #5b62e0;
+  --series-2: #1baf7a;
+  --series-3: #2a78d6;
+  --series-4: #e87ba4;
+  --series-5: #8a8a93;
 
-  /* Rampe séquentielle argile, clair -> foncé (heatmap) */
-  --ramp-1: #f7e4db;
-  --ramp-2: #f0c9b7;
-  --ramp-3: #e6ab90;
-  --ramp-4: #db8b69;
-  --ramp-5: #c96a44;
-  --ramp-6: #a85434;
-  --ramp-7: #833f27;
+  /* Rampe séquentielle indigo, clair -> foncé (heatmap) */
+  --ramp-1: #eef0ff;
+  --ramp-2: #d9dcff;
+  --ramp-3: #b9beff;
+  --ramp-4: #959cf7;
+  --ramp-5: #7178e8;
+  --ramp-6: #535ad0;
+  --ramp-7: #3a3fa6;
 
   /* Statuts — échelle fixe, jamais thématisée */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --status-good: #0a7d0a;
+  --status-warning: #946500;
+  --status-serious: #e07b4f;
+  --status-critical: #c53030;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --page: #1f1e1d;
-    --surface: #262624;
-    --surface-sunken: #1a1a19;
-    --surface-hover: #302f2c;
-    --ink: #f5f4ef;
-    --ink-secondary: #c3c2b7;
-    --ink-muted: #8f8e86;
-    --border: #383734;
-    --border-strong: #4a4945;
-    --accent: #d1704e;
-    --accent-hover: #e08a6a;
-    --accent-wash: #33271f;
+    --page: #111213;
+    --surface: #191a1c;
+    --surface-sunken: #202124;
+    --surface-hover: #25262a;
+    --ink: #ecebe7;
+    --ink-secondary: #b0afa9;
+    --ink-muted: #8a8982;
+    --border: #2a2b2e;
+    --border-strong: #3a3b3f;
+    --accent: #8b93ff;
+    --accent-hover: #a3a9ff;
+    --accent-wash: #23254a;
+    --on-accent: #111213;
 
-    --grid: #33322f;
-    --axis: #45443f;
+    --grid: #26272a;
+    --axis: #3a3b3f;
 
-    --series-1: #d1704e;
-    --series-2: #3987e5;
-    --series-3: #199e70;
-    --series-4: #9085e9;
-    --series-5: #c98500;
+    --series-1: #747cf0;
+    --series-2: #199e70;
+    --series-3: #3987e5;
+    --series-4: #d55181;
+    --series-5: #7d7d86;
 
-    --ramp-1: #3a2419;
-    --ramp-2: #55321f;
-    --ramp-3: #74432a;
-    --ramp-4: #935437;
-    --ramp-5: #b06746;
-    --ramp-6: #c97f5c;
-    --ramp-7: #e0a184;
+    --ramp-1: #1f2142;
+    --ramp-2: #2b2e63;
+    --ramp-3: #3a3e85;
+    --ramp-4: #4d52a8;
+    --ramp-5: #6268c9;
+    --ramp-6: #7d83e6;
+    --ramp-7: #a0a5ff;
+
+    --status-good: #3fb950;
+  --status-warning: #e5b04a;
+    --status-critical: #e5675a;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --page: #1f1e1d;
-  --surface: #262624;
-  --surface-sunken: #1a1a19;
-  --surface-hover: #302f2c;
-  --ink: #f5f4ef;
-  --ink-secondary: #c3c2b7;
-  --ink-muted: #8f8e86;
-  --border: #383734;
-  --border-strong: #4a4945;
-  --accent: #d1704e;
-  --accent-hover: #e08a6a;
-  --accent-wash: #33271f;
+  --page: #111213;
+  --surface: #191a1c;
+  --surface-sunken: #202124;
+  --surface-hover: #25262a;
+  --ink: #ecebe7;
+  --ink-secondary: #b0afa9;
+  --ink-muted: #8a8982;
+  --border: #2a2b2e;
+  --border-strong: #3a3b3f;
+  --accent: #8b93ff;
+  --accent-hover: #a3a9ff;
+  --accent-wash: #23254a;
+  --on-accent: #111213;
 
-  --grid: #33322f;
-  --axis: #45443f;
+  --grid: #26272a;
+  --axis: #3a3b3f;
 
-  --series-1: #d1704e;
-  --series-2: #3987e5;
-  --series-3: #199e70;
-  --series-4: #9085e9;
-  --series-5: #c98500;
+  --series-1: #747cf0;
+  --series-2: #199e70;
+  --series-3: #3987e5;
+  --series-4: #d55181;
+  --series-5: #7d7d86;
 
-  --ramp-1: #3a2419;
-  --ramp-2: #55321f;
-  --ramp-3: #74432a;
-  --ramp-4: #935437;
-  --ramp-5: #b06746;
-  --ramp-6: #c97f5c;
-  --ramp-7: #e0a184;
+  --ramp-1: #1f2142;
+  --ramp-2: #2b2e63;
+  --ramp-3: #3a3e85;
+  --ramp-4: #4d52a8;
+  --ramp-5: #6268c9;
+  --ramp-6: #7d83e6;
+  --ramp-7: #a0a5ff;
+
+  --status-good: #3fb950;
+  --status-warning: #e5b04a;
+  --status-critical: #e5675a;
 }
 
 @theme inline {
@@ -137,13 +153,14 @@
   --color-line-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-wash: var(--accent-wash);
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-plex), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 body {
   background: var(--page);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-plex), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -158,6 +175,21 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* Titre de carte : petites capitales espacées, comme les repères d'un instrument. */
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Chiffres et repères techniques : la police mono porte l'identité terminal. */
+.mono {
+  font-family: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {

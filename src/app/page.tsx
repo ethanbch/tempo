@@ -4,18 +4,25 @@ import { getMessages } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { loadLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
+import { isTabKey } from "@/lib/tabs";
 import { Dashboard } from "@/components/Dashboard";
 import { I18nProvider } from "@/components/I18nProvider";
 
 /** Le rapport dépend de fichiers locaux qui changent en continu. */
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
-  const [scan, account, locale] = await Promise.all([
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [scan, account, locale, params] = await Promise.all([
     scanUsage(),
     readAccount(),
     getRequestLocale(),
+    searchParams,
   ]);
+  const tab = isTabKey(params.tab) ? params.tab : "overview";
   const limits = await loadLimits(scan);
   const report = buildReport(scan, "7d");
 
@@ -25,7 +32,7 @@ export default async function Page() {
 
   return (
     <I18nProvider initialLocale={locale}>
-      <Dashboard initialReport={report} initialLimits={limits} account={account} />
+      <Dashboard initialReport={report} initialLimits={limits} initialTab={tab} account={account} />
     </I18nProvider>
   );
 }

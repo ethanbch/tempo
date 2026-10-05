@@ -98,6 +98,11 @@ export function createFormat(locale: Locale) {
       return dayLong.format(parseDayKey(key));
     },
 
+    /** Jour court d'un instant ISO : « 5 oct. ». */
+    formatDate(iso: string): string {
+      return dayLabel.format(new Date(iso));
+    },
+
     formatTime(iso: string): string {
       return timeLabel.format(new Date(iso));
     },

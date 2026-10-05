@@ -1,6 +1,7 @@
 <div align="center">
 
-# Tempo
+<img src="brand/svg/tempo-wordmark-on-light.svg#gh-light-mode-only" alt="tempo" height="56">
+<img src="brand/svg/tempo-wordmark-on-dark.svg#gh-dark-mode-only" alt="tempo" height="56">
 
 **A local dashboard for your Claude Code usage** — cost, tokens, cache
 efficiency, quota windows, and a breakdown by model and by project.
@@ -19,6 +20,14 @@ efficiency, quota windows, and a breakdown by model and by project.
 Built for **Claude Pro and Max** subscribers who want to know what their
 Claude Code sessions actually cost, without sending anything anywhere.
 
+![Tempo's overview: session and weekly limits with their pace, API-equivalent cost against the previous period, cost per day, and the optimization teaser](docs/screenshot.png)
+
+The overview fits on one screen; three more tabs hold the detail:
+**Spend** (by model, project, session and effort level), **Activity** (limit
+history and projections, 5-hour windows, when you use Claude) and
+**Optimize** (levers and cache rebuilds). Explanations sit behind the ⓘ
+next to each title, and the calculation method behind "How it's computed".
+
 ## Table of contents
 
 - [Why Tempo](#why-tempo)
@@ -33,6 +42,7 @@ Claude Code sessions actually cost, without sending anything anywhere.
 - [Project structure](#project-structure)
 - [Configuration](#configuration)
 - [Design notes](#design-notes)
+- [Brand](#brand)
 - [License](#license)
 
 ## Why Tempo
@@ -375,11 +385,19 @@ of an unknown cap. For the actual percentage of your limits, see
 
 ## Design notes
 
-The categorical palette and the sequential ramp were validated against the
-app's real surfaces in both themes: lightness band, chroma floor, separation
-under color-blindness simulation, and contrast. Two hues fall below 3:1 in
-light mode; direct end-of-bar labels and the table view (the "View table"
-button) are the required compensation, not an extra. Charts are hand-written
+The interface is half clean product UI, half terminal: neutral surfaces, a
+single indigo accent, IBM Plex Sans for text and JetBrains Mono for figures,
+times and paths, segmented gauges echoing the statusline. Dark is the
+reference theme; light gets the same care. Yellow and red are reserved for
+limit alerts, which is why the accent is cool.
+
+Every text colour holds at least 4.5:1 contrast on the surfaces it sits on, in
+both themes. The categorical palette (indigo, aqua, blue, pink, then grey for
+"other") and the indigo ramp were validated against the app's real surfaces in
+both themes: lightness band, chroma floor, separation under color-blindness
+simulation, and contrast. Two hues fall below 3:1 in light mode; direct
+end-of-bar labels and the daily table (Spend tab) are the required
+compensation, not an extra. Charts are hand-written
 SVG to match brand specs — rounded data-side caps, a 2px gap between
 adjoining segments, bars capped at 24px.
 
@@ -388,6 +406,14 @@ single-hue ramp whose steps rise with the level, rather than per-series
 colors. The two steps closest to the ground are dropped — they exist to
 represent "almost zero" on a continuous scale and don't hold the minimum
 contrast required of an ordered scale.
+
+## Brand
+
+The logo is the name in JetBrains Mono ExtraBold followed by a block
+cursor. `brand/` holds the exports: outlined SVGs (no font needed), PNGs from
+16 to 2048 px, and a one-page PDF sheet with variants, colours, clear space
+and misuse. JetBrains Mono is under the SIL Open Font License, which allows
+its use in a logo.
 
 ## Tech stack
 

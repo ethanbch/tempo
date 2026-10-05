@@ -4,13 +4,13 @@ import type { Format } from "@/lib/format";
 import type { Messages } from "@/lib/i18n";
 import type { LimitAnalysis, LimitKind, LimitsReport } from "@/lib/limits";
 import { useI18n } from "@/components/I18nProvider";
-import { Card } from "@/components/ui";
+import { Card, SegmentedMeter } from "@/components/ui";
 
 /** Seuils à partir desquels la jauge change de ton. */
 const WARNING_AT = 0.7;
 const CRITICAL_AT = 0.9;
 
-function tone(used: number): string {
+export function tone(used: number): string {
   if (used >= CRITICAL_AT) return "var(--status-critical)";
   if (used >= WARNING_AT) return "var(--status-warning)";
   return "var(--accent)";
@@ -108,7 +108,7 @@ function PaceChart({ analysis, now }: { analysis: LimitAnalysis; now: number }) 
   );
 }
 
-function resetText(kind: LimitKind, analysis: LimitAnalysis, now: number, t: Messages, f: Format) {
+export function resetText(kind: LimitKind, analysis: LimitAnalysis, now: number, t: Messages, f: Format) {
   if (analysis.expired) return t.limits.expired;
   if (!analysis.resetsAt) return t.limits.unknownReset;
   const remaining = f.countdown(Date.parse(analysis.resetsAt) - now);
@@ -117,7 +117,7 @@ function resetText(kind: LimitKind, analysis: LimitAnalysis, now: number, t: Mes
     : t.limits.weekReset(remaining, f.formatDateTime(analysis.resetsAt));
 }
 
-function paceText(
+export function paceText(
   kind: LimitKind,
   analysis: LimitAnalysis,
   t: Messages,
@@ -170,25 +170,14 @@ function Gauge({
     <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-sunken)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[13px] text-[var(--ink-secondary)]">{title}</p>
-        <p className="tabular text-[26px] font-semibold leading-tight text-[var(--ink)]">
+        <p className="mono text-[26px] font-medium leading-tight text-[var(--ink)]">
           {f.percent(used)}
         </p>
       </div>
-      <div
-        className="mt-3 h-2.5 w-full overflow-hidden rounded-full"
-        style={{ background: "var(--ramp-1)" }}
-        role="meter"
-        aria-valuenow={Math.round(used * 100)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={t.limits.meterLabel(title)}
-      >
-        <div
-          className="h-full rounded-full transition-[width]"
-          style={{ width: `${used > 0 ? Math.max(1, used * 100) : 0}%`, background: tone(used) }}
-        />
+      <div className="mt-3">
+        <SegmentedMeter value={used} color={tone(used)} label={t.limits.meterLabel(title)} />
       </div>
-      <p className="mt-1.5 text-[12px] text-[var(--ink-muted)]">{resetText(kind, analysis, now, t, f)}</p>
+      <p className="mono mt-2 text-[11.5px] text-[var(--ink-muted)]">{resetText(kind, analysis, now, t, f)}</p>
 
       <PaceChart analysis={analysis} now={now} />
 
@@ -232,7 +221,7 @@ export function UsageLimits({ limits, now }: { limits: LimitsReport | null; now:
   }
 
   return (
-    <Card title={t.limits.title} subtitle={t.limits.subtitle}>
+    <Card title={t.limits.title} info={t.limits.subtitle}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Gauge kind="session" analysis={limits.session} now={now} />
         <Gauge kind="week" analysis={limits.week} now={now} />

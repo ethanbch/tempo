@@ -205,6 +205,11 @@ export interface Summary extends TokenTotals {
   lastActivity: string | null;
   /** Nombre de jours distincts avec au moins une requête. */
   activeDays: number;
+  /**
+   * Coût de la période de même durée juste avant, avec les mêmes filtres, pour
+   * situer la période choisie. `null` quand tout l'historique est retenu.
+   */
+  previousCost: number | null;
 }
 
 /** Un projet rencontré dans l'historique, pour peupler le filtre. */
@@ -492,6 +497,21 @@ export function buildReport(
 
   const allModels = [...new Set(scan.events.map((event) => canonicalModelId(event.model)))].sort();
 
+  // Même durée, juste avant, mêmes filtres : de quoi dire si l'on dépense plus
+  // ou moins qu'avant, sans rien supposer d'un plafond.
+  let previousCost: number | null = null;
+  if (since !== null && range !== "all") {
+    const from = since - RANGE_DURATIONS[range];
+    const wantedModel = filters.model ? canonicalModelId(filters.model) : null;
+    previousCost = 0;
+    for (const event of scan.events) {
+      if (event.time < from || event.time >= since) continue;
+      if (filters.projectId && event.projectId !== filters.projectId) continue;
+      if (wantedModel && canonicalModelId(event.model) !== wantedModel) continue;
+      previousCost += event.cost.total * factorFor(event.sessionId);
+    }
+  }
+
   const allProjectsMap = new Map<string, string>();
   for (const event of scan.events) {
     if (!allProjectsMap.has(event.projectId)) allProjectsMap.set(event.projectId, event.projectName);
@@ -519,6 +539,7 @@ export function buildReport(
       firstActivity: firstEvent?.timestamp ?? null,
       lastActivity: lastEvent?.timestamp ?? null,
       activeDays: daily.size,
+      previousCost,
     },
     daily: dailyPoints,
     byModel: [...models.values()].sort((a, b) => b.cost - a.cost),

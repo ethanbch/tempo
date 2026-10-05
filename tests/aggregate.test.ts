@@ -57,6 +57,19 @@ describe("buildReport", () => {
     expect(blocks.map((block) => block.active)).toEqual([false, false, true]);
   });
 
+  it("compares with the previous period of the same length", () => {
+    const scan = makeScan([
+      makeEvent({ time: NOW - 30 * HOUR, costTotal: 4 }),
+      makeEvent({ time: NOW - 30 * HOUR, costTotal: 7, projectId: "other" }),
+      makeEvent({ time: NOW - 60 * HOUR, costTotal: 100 }),
+      makeEvent({ time: NOW - HOUR, costTotal: 6 }),
+    ]);
+
+    expect(buildReport(scan, "24h", NOW).summary.previousCost).toBeCloseTo(11);
+    expect(buildReport(scan, "24h", NOW, { projectId: "other" }).summary.previousCost).toBeCloseTo(7);
+    expect(buildReport(scan, "all", NOW).summary.previousCost).toBeNull();
+  });
+
   it("filters by period and by project", () => {
     const scan = makeScan([
       makeEvent({ time: NOW - 48 * HOUR, costTotal: 10 }),

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+import { useI18n } from "@/components/I18nProvider";
 
 /** Les huit emplacements catégoriels, dans leur ordre figé. */
 export const SERIES_VARS = [
@@ -45,19 +47,61 @@ export const MAX_BAR = 24;
 /** Rayon de l'extrémité arrondie d'une barre, côté données. */
 export const BAR_RADIUS = 4;
 
+/**
+ * Explication à la demande : un ⓘ discret qui ouvre une bulle au survol, au
+ * focus clavier ou au toucher. Les cartes gardent ainsi un titre court.
+ */
+export function InfoTip({ text, label }: { text: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={open ? id : undefined}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="grid h-[18px] w-[18px] place-items-center rounded-full text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)]"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+          <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M8 7.2V11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="8" cy="5" r=".9" fill="currentColor" />
+        </svg>
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          id={id}
+          className="absolute left-[-8px] top-7 z-30 w-[min(300px,80vw)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-[12.5px] font-normal normal-case leading-relaxed tracking-normal text-[var(--ink-secondary)] shadow-xl"
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function Card({
   title,
-  subtitle,
+  info,
   action,
   children,
   className = "",
 }: {
   title?: string;
-  subtitle?: string;
+  /** Explication affichée dans une bulle ⓘ à côté du titre. */
+  info?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     // `min-w-0` est indispensable : sans lui un enfant de grille garde
     // `min-width: auto`, la piste ne peut pas descendre sous la largeur du SVG
@@ -66,20 +110,56 @@ export function Card({
       className={`min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 ${className}`}
     >
       {(title || action) && (
-        <header className="mb-4 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            {title && <h2 className="text-[15px] font-semibold text-[var(--ink)]">{title}</h2>}
-            {subtitle && (
-              <p className="mt-0.5 text-[13px] leading-snug text-[var(--ink-secondary)]">
-                {subtitle}
-              </p>
-            )}
+        // Une carte repliée n'a que son en-tête : pas d'espace pour un corps absent.
+        <header className={`flex items-center justify-between gap-4 ${children ? "mb-4" : ""}`}>
+          <div className="flex min-w-0 items-center gap-1.5">
+            {title && <h2 className="eyebrow">{title}</h2>}
+            {info && <InfoTip text={info} label={t.method.info} />}
           </div>
           {action}
         </header>
       )}
       {children}
     </section>
+  );
+}
+
+/**
+ * Jauge en segments, le langage visuel de la statusline : chaque segment est
+ * une part fixe, ceux qui sont atteints s'allument.
+ */
+export function SegmentedMeter({
+  value,
+  color,
+  label,
+  segments = 20,
+}: {
+  /** Part consommée, entre 0 et 1. */
+  value: number;
+  color: string;
+  label: string;
+  segments?: number;
+}) {
+  // Une consommation non nulle allume toujours au moins un segment.
+  const lit = value > 0 ? Math.max(1, Math.round(Math.min(1, value) * segments)) : 0;
+  return (
+    <div
+      role="meter"
+      aria-label={label}
+      aria-valuenow={Math.round(value * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className="grid gap-[3px]"
+      style={{ gridTemplateColumns: `repeat(${segments}, minmax(0, 1fr))` }}
+    >
+      {Array.from({ length: segments }, (_, index) => (
+        <span
+          key={index}
+          className="h-2.5 rounded-[2px]"
+          style={{ background: index < lit ? color : "var(--surface-sunken)" }}
+        />
+      ))}
+    </div>
   );
 }
 

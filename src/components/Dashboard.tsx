@@ -5,20 +5,22 @@ import { useEffect, useRef, useState } from "react";
 import type { RangeKey, UsageReport } from "@/lib/aggregate";
 import { LOCALES, LOCALE_NAMES, isLocale } from "@/lib/i18n";
 import { UNSPECIFIED_EFFORT } from "@/lib/insights";
+import { TABS, type TabKey } from "@/lib/tabs";
 import { modelLabel } from "@/lib/pricing";
 import { modelSlot } from "@/lib/series";
 import type { LimitsReport } from "@/lib/limits";
 import type { Account } from "@/lib/types";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { RankedBars } from "@/components/charts/RankedBars";
-import { StackedCost } from "@/components/charts/StackedCost";
 import { useI18n } from "@/components/I18nProvider";
 import { Levers } from "@/components/Levers";
+import { Logo } from "@/components/Logo";
+import { Overview } from "@/components/Overview";
 import { QuotaWindows } from "@/components/QuotaWindows";
 import { SessionDetail } from "@/components/SessionDetail";
 import { UsageLimits } from "@/components/UsageLimits";
 import { UsageTable } from "@/components/UsageTable";
-import { Card, ORDINAL_VARS, SERIES_VARS, StatTile } from "@/components/ui";
+import { Card, ORDINAL_VARS, SERIES_VARS } from "@/components/ui";
 
 /** Échelle d'effort, du plus léger au plus soutenu : c'est un ordre, pas une liste. */
 const EFFORT_SCALE = ["low", "medium", "high", "xhigh", "max"];
@@ -28,13 +30,17 @@ const REFRESH_INTERVAL_MS = 30_000;
 
 const RANGES: RangeKey[] = ["24h", "7d", "30d", "all"];
 
+
+
 export function Dashboard({
   initialReport,
   initialLimits,
+  initialTab,
   account,
 }: {
   initialReport: UsageReport;
   initialLimits: LimitsReport | null;
+  initialTab: TabKey;
   account: Account;
 }) {
   const { t, f } = useI18n();
@@ -48,6 +54,8 @@ export function Dashboard({
   const [error, setError] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  const [showMethod, setShowMethod] = useState(false);
   const inFlight = useRef<AbortController | null>(null);
   /** Horodatage du dernier appel terminé, qui borne la cadence réelle. */
   const lastFetchedAt = useRef<number>(Date.parse(initialReport.meta.generatedAt));
@@ -152,7 +160,6 @@ export function Dashboard({
     };
   }, [range, projectId, model]);
 
-  const { summary } = report;
   const models = report.byModel.map((model) => ({
     key: model.model,
     label: model.label,
@@ -235,7 +242,8 @@ export function Dashboard({
 
   const sessions = report.bySession.slice(0, 8).map((session) => ({
     key: session.sessionId,
-    label: session.projectName,
+    // Un même projet revient souvent : la date distingue ses sessions.
+    label: `${session.projectName} · ${f.formatDate(session.lastActivity)}`,
     value: session.cost,
     // Série nominale : une seule teinte, la longueur porte déjà la grandeur.
     color: SERIES_VARS[0],
@@ -248,17 +256,54 @@ export function Dashboard({
     ],
   }));
 
+  function selectTab(next: TabKey) {
+    setTab(next);
+    // L'onglet vit dans l'URL : un rechargement ou un lien partagé y ramène.
+    const url = new URL(window.location.href);
+    if (next === "overview") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0 });
+  }
+
+  const selectClass =
+    "h-9 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]";
+
   return (
-    <div className="mx-auto w-full max-w-[1140px] px-5 py-8 sm:px-8">
+    <div className="mx-auto w-full max-w-[1140px] px-4 py-6 sm:px-8 sm:py-8">
       <Header account={account} report={report} />
 
-      {/* Les filtres tiennent sur une ligne, au-dessus de tout ce qu'ils cadrent. */}
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Onglets à gauche, filtres à droite : ils cadrent tout ce qui suit. */}
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-[var(--border)]">
+        <div role="tablist" aria-label={t.tabs.label} className="-mb-px flex gap-1 overflow-x-auto">
+          {TABS.map((key) => {
+            const selected = key === tab;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                id={`tab-${key}`}
+                aria-selected={selected}
+                aria-controls={`panel-${key}`}
+                onClick={() => selectTab(key)}
+                className={`whitespace-nowrap border-b-2 px-3 pb-3 pt-1 text-[14px] transition-colors ${
+                  selected
+                    ? "border-[var(--accent)] font-medium text-[var(--ink)]"
+                    : "border-transparent text-[var(--ink-secondary)] hover:text-[var(--ink)]"
+                }`}
+              >
+                {t.tabs[key]}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pb-3">
           <div
             role="group"
             aria-label={t.filters.period}
-            className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
+            className="inline-flex h-9 items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5"
           >
             {RANGES.map((option) => {
               const selected = option === range;
@@ -268,13 +313,13 @@ export function Dashboard({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => void reload(option, projectId, model)}
-                  className={`rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
+                  className={`mono h-full rounded-[10px] px-2.5 text-[12px] transition-colors ${
                     selected
-                      ? "bg-[var(--accent)] font-medium text-white"
+                      ? "bg-[var(--accent)] font-medium text-[var(--on-accent)]"
                       : "text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
                   }`}
                 >
-                  {t.filters.ranges[option]}
+                  {option === "all" ? t.filters.ranges.all : option}
                 </button>
               );
             })}
@@ -284,7 +329,7 @@ export function Dashboard({
             aria-label={t.filters.byProject}
             value={projectId}
             onChange={(event) => void reload(range, event.target.value, model)}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
+            className={selectClass}
           >
             <option value="">{t.filters.allProjects}</option>
             {report.allProjects.map((project) => (
@@ -298,7 +343,7 @@ export function Dashboard({
             aria-label={t.filters.byModel}
             value={model}
             onChange={(event) => void reload(range, projectId, event.target.value)}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
+            className={selectClass}
           >
             <option value="">{t.filters.allModels}</option>
             {report.allModels.map((id) => (
@@ -308,15 +353,6 @@ export function Dashboard({
             ))}
           </select>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowTable((value) => !value)}
-          aria-pressed={showTable}
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
-        >
-          {showTable ? t.filters.hideTable : t.filters.showTable}
-        </button>
       </div>
 
       {error && (
@@ -331,112 +367,102 @@ export function Dashboard({
 
       {/* Pendant un rechargement, le rendu précédent tient le cadre. */}
       <div
-        className={`transition-opacity ${loading ? "opacity-50" : "opacity-100"}`}
+        role="tabpanel"
+        id={`panel-${tab}`}
+        aria-labelledby={`tab-${tab}`}
+        className={`mt-5 transition-opacity ${loading ? "opacity-50" : "opacity-100"}`}
         aria-busy={loading}
       >
-        <div className="mt-4">
-          <UsageLimits limits={limits} now={now} />
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile
-            label={t.stats.cost}
-            value={usd(summary.cost)}
-            hint={account.plan ? t.stats.costHintPlan(account.plan) : t.stats.costHint}
-            emphasis
+        {tab === "overview" && (
+          <Overview
+            report={report}
+            limits={limits}
+            now={now}
+            range={range}
+            account={account}
+            onNavigate={selectTab}
           />
-          <StatTile
-            label={t.common.requests}
-            value={integer(summary.requests)}
-            hint={t.stats.requestsHint(integer(summary.prompts), integer(summary.sessions), summary.sessions)}
-          />
-          <StatTile
-            label={t.stats.tokens}
-            value={compactTokens(summary.totalTokens)}
-            hint={t.stats.tokensHint(
-              compactTokens(summary.outputTokens),
-              compactTokens(summary.thinkingTokens),
-            )}
-          />
-          <StatTile
-            label={t.stats.cache}
-            value={percent(summary.cacheHitRate, 1)}
-            hint={t.stats.cacheHint(compactTokens(summary.cacheReadTokens))}
-          />
-        </div>
+        )}
 
-        <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[1.35fr_1fr]">
-          <Card title={t.cards.daily.title} subtitle={t.cards.daily.subtitle}>
-            <StackedCost data={report.daily} />
-          </Card>
-
-          <Card title={t.cards.quota.title} subtitle={t.cards.quota.subtitle}>
-            <QuotaWindows blocks={report.blocks} now={now} />
-          </Card>
-        </div>
-
-        <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
-          <Card title={t.cards.byModel.title} subtitle={t.cards.byModel.subtitle}>
-            <RankedBars items={models} formatValue={(value) => usd(value)} />
-          </Card>
-
-          <Card title={t.cards.byProject.title} subtitle={t.cards.byProject.subtitle}>
-            <RankedBars items={projects} formatValue={(value) => usd(value)} />
-          </Card>
-        </div>
-
-        <div className="mt-4">
-          <Card title={t.cards.sessions.title} subtitle={t.cards.sessions.subtitle}>
-            <RankedBars
-              items={sessions}
-              formatValue={(value) => usd(value)}
-              onSelect={setSelectedSessionId}
-            />
-          </Card>
-        </div>
-
-        <div className="mt-4">
-          <Card title={t.cards.heatmap.title} subtitle={t.cards.heatmap.subtitle}>
-            <ActivityHeatmap cells={report.heatmap} />
-          </Card>
-        </div>
-
-        <div className="mt-4">
-          <Card title={t.cards.levers.title} subtitle={t.cards.levers.subtitle}>
-            <Levers levers={report.insights.levers} />
-          </Card>
-        </div>
-
-        <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
-          <Card title={t.cards.cacheCauses.title} subtitle={t.cards.cacheCauses.subtitle}>
-            <RankedBars
-              items={cacheCauses}
-              formatValue={(value) => usd(value)}
-              labelWidth={172}
-              emptyMessage={t.cards.cacheCauses.empty}
-            />
-          </Card>
-
-          <Card title={t.cards.effort.title} subtitle={t.cards.effort.subtitle}>
-            <RankedBars
-              items={efforts}
-              formatValue={(value) => usd(value)}
-              labelWidth={172}
-              emptyMessage={t.cards.effort.empty}
-            />
-          </Card>
-        </div>
-
-        {showTable && (
-          <div className="mt-4">
-            <Card title={t.cards.table.title} subtitle={t.cards.table.subtitle}>
-              <UsageTable daily={report.daily} />
+        {tab === "spend" && (
+          <div className="grid gap-4">
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              <Card title={t.cards.byModel.title} info={t.cards.byModel.subtitle}>
+                <RankedBars items={models} formatValue={(value) => usd(value)} />
+              </Card>
+              <Card title={t.cards.byProject.title} info={t.cards.byProject.subtitle}>
+                <RankedBars items={projects} formatValue={(value) => usd(value)} />
+              </Card>
+            </div>
+            <Card title={t.cards.sessions.title} info={t.cards.sessions.subtitle}>
+              <RankedBars
+                items={sessions}
+                formatValue={(value) => usd(value)}
+                labelWidth={210}
+                onSelect={setSelectedSessionId}
+              />
+            </Card>
+            <Card title={t.cards.effort.title} info={t.cards.effort.subtitle}>
+              <RankedBars
+                items={efforts}
+                formatValue={(value) => usd(value)}
+                labelWidth={172}
+                emptyMessage={t.cards.effort.empty}
+              />
+            </Card>
+            <Card
+              title={t.cards.table.title}
+              info={t.cards.table.subtitle}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowTable((value) => !value)}
+                  aria-pressed={showTable}
+                  className="rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-wash)]"
+                >
+                  {showTable ? t.filters.hideTable : t.filters.showTable}
+                </button>
+              }
+            >
+              {showTable && <UsageTable daily={report.daily} />}
             </Card>
           </div>
         )}
 
-        <Footnotes report={report} />
+        {tab === "activity" && (
+          <div className="grid gap-4">
+            <UsageLimits limits={limits} now={now} />
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_1.35fr]">
+              <Card title={t.cards.quota.title} info={t.cards.quota.subtitle}>
+                <QuotaWindows blocks={report.blocks} now={now} />
+              </Card>
+              <Card title={t.cards.heatmap.title} info={t.cards.heatmap.subtitle}>
+                <ActivityHeatmap cells={report.heatmap} />
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {tab === "optimize" && (
+          <div className="grid gap-4">
+            <Card title={t.cards.levers.title} info={t.cards.levers.subtitle}>
+              <Levers levers={report.insights.levers} />
+            </Card>
+            <Card title={t.cards.cacheCauses.title} info={t.cards.cacheCauses.subtitle}>
+              <RankedBars
+                items={cacheCauses}
+                formatValue={(value) => usd(value)}
+                labelWidth={172}
+                emptyMessage={t.cards.cacheCauses.empty}
+              />
+            </Card>
+          </div>
+        )}
       </div>
+
+      <Footer report={report} onOpenMethod={() => setShowMethod(true)} />
+
+      {showMethod && <MethodPanel report={report} onClose={() => setShowMethod(false)} />}
 
       {selectedSessionId && (
         <SessionDetail
@@ -542,51 +568,38 @@ function LanguagePicker() {
 function Header({ account, report }: { account: Account; report: UsageReport }) {
   const { t, f } = useI18n();
   return (
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
-            style={{ background: "var(--accent)" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M7 20.5H11.2L13.8 11L18.2 23L20.8 14.5H25"
-                stroke="#faf9f5"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          <h1
-            className="text-[23px] font-semibold lowercase text-[var(--ink)]"
-            style={{ letterSpacing: "-0.02em" }}
-          >
-            tempo
-          </h1>
-        </div>
-        <p className="mt-1.5 text-[13px] text-[var(--ink-secondary)]">
-          {t.header.tagline}
-        </p>
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-baseline gap-3">
+        <h1>
+          <Logo size={24} />
+        </h1>
+        <p className="hidden text-[13px] text-[var(--ink-muted)] md:block">{t.header.tagline}</p>
       </div>
 
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-right">
+      <div className="flex items-center gap-2">
+        <div
+          className="hidden h-9 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] sm:flex"
+          title={account.email ?? undefined}
+        >
           {account.missing ? (
-            <p className="text-[13px] text-[var(--ink-secondary)]">{t.header.noAccount}</p>
+            <span className="text-[var(--ink-secondary)]">{t.header.noAccount}</span>
           ) : (
             <>
-              <p className="text-[13px] font-medium text-[var(--ink)]">{account.email}</p>
-              <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--status-good)" }}
+              />
+              <span className="font-medium text-[var(--ink)]">
                 {account.plan ? t.header.plan(account.plan) : t.header.account}
-                {report.summary.lastActivity
-                  ? ` · ${t.header.active(
-                      f.timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt)),
-                    )}`
-                  : ""}
-              </p>
+              </span>
+              {report.summary.lastActivity && (
+                <span className="text-[var(--ink-muted)]">
+                  {t.header.active(
+                    f.timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt)),
+                  )}
+                </span>
+              )}
             </>
           )}
         </div>
@@ -597,37 +610,89 @@ function Header({ account, report }: { account: Account; report: UsageReport }) 
   );
 }
 
-function Footnotes({ report }: { report: UsageReport }) {
+/** Pied de page en une ligne : d'où viennent les chiffres, et la méthode à la demande. */
+function Footer({ report, onOpenMethod }: { report: UsageReport; onOpenMethod: () => void }) {
+  const { t, f } = useI18n();
+  const { meta } = report;
+  return (
+    <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4 text-[12px] text-[var(--ink-muted)]">
+      <p className="mono min-w-0 truncate">
+        {t.footer.files(f.integer(meta.fileCount), f.bytes(meta.byteCount))} {meta.root}
+        {t.footer.scanned(f.formatDateTime(meta.scannedAt))}
+      </p>
+      <button
+        type="button"
+        onClick={onOpenMethod}
+        className="shrink-0 rounded-md px-1.5 py-0.5 font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-wash)]"
+      >
+        {t.method.open}
+      </button>
+    </footer>
+  );
+}
+
+/** La méthode de calcul et la confidentialité, réunies dans un panneau. */
+function MethodPanel({ report, onClose }: { report: UsageReport; onClose: () => void }) {
   const { t, f } = useI18n();
   const { reconciliation, meta, summary } = report;
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <footer className="mt-8 space-y-3 border-t border-[var(--border)] pt-5 text-[12px] leading-relaxed text-[var(--ink-muted)]">
-      <p>
-        <strong className="font-medium text-[var(--ink-secondary)]">{t.footer.readTitle}</strong>{" "}
-        {t.footer.read}
-      </p>
-      <p>
-        <strong className="font-medium text-[var(--ink-secondary)]">{t.footer.computeTitle}</strong>{" "}
-        {t.footer.compute(
-          f.usd(reconciliation.rawCost),
-          f.usd(reconciliation.untrackedCost),
-          f.percent(reconciliation.calibratedShare, 1),
-        )}
-        {reconciliation.uncalibratedSessions > 0
-          ? t.footer.uncalibrated(f.integer(reconciliation.uncalibratedSessions))
-          : ""}
-        {reconciliation.hasUnknownModelCost ? t.footer.unknownModel : ""}
-      </p>
-      <p>
-        {t.footer.files(f.integer(meta.fileCount), f.bytes(meta.byteCount))}{" "}
-        <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">{meta.root}</code>
-        {meta.skippedLines > 0 ? t.footer.skipped(f.integer(meta.skippedLines)) : ""}
-        {summary.firstActivity ? t.footer.since(f.formatDateTime(summary.firstActivity)) : ""}
-        {t.footer.scanned(f.formatDateTime(meta.scannedAt))}
-        {summary.activeDays > 0 ? t.footer.activeDays(f.integer(summary.activeDays)) : ""}
-      </p>
-      <p>{t.footer.privacy(f.duration(5 * 60 * 60 * 1000))}</p>
-    </footer>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.method.title}
+      className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[600px] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="text-[16px] font-semibold text-[var(--ink)]">{t.method.title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-[13px] text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
+          >
+            {t.session.close}
+          </button>
+        </div>
+        <div className="mt-4 space-y-4 text-[13px] leading-relaxed text-[var(--ink-secondary)]">
+          <p>
+            <strong className="font-medium text-[var(--ink)]">{t.footer.readTitle}</strong>{" "}
+            {t.footer.read}
+          </p>
+          <p>
+            <strong className="font-medium text-[var(--ink)]">{t.footer.computeTitle}</strong>{" "}
+            {t.footer.compute(
+              f.usd(reconciliation.rawCost),
+              f.usd(reconciliation.untrackedCost),
+              f.percent(reconciliation.calibratedShare, 1),
+            )}
+            {reconciliation.uncalibratedSessions > 0
+              ? t.footer.uncalibrated(f.integer(reconciliation.uncalibratedSessions))
+              : ""}
+            {reconciliation.hasUnknownModelCost ? t.footer.unknownModel : ""}
+          </p>
+          <p>{t.footer.privacy(f.duration(5 * 60 * 60 * 1000))}</p>
+          <p className="mono rounded-xl bg-[var(--surface-sunken)] p-3 text-[12px] text-[var(--ink-muted)]">
+            {t.footer.files(f.integer(meta.fileCount), f.bytes(meta.byteCount))} {meta.root}
+            {meta.skippedLines > 0 ? t.footer.skipped(f.integer(meta.skippedLines)) : ""}
+            {summary.firstActivity ? t.footer.since(f.formatDateTime(summary.firstActivity)) : ""}
+            {t.footer.scanned(f.formatDateTime(meta.scannedAt))}
+            {summary.activeDays > 0 ? t.footer.activeDays(f.integer(summary.activeDays)) : ""}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
