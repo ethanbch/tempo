@@ -128,15 +128,15 @@ const ALERT_THRESHOLDS = (() => {
     .sort((a, b) => a - b);
 })();
 
-/* Palette dans l'esprit Claude Code : l'orange Claude, du gris pour le reste. */
+/* Palette Readout (spécification terminal) : l'accent indigo, les statuts réservés, des gris. */
 const RESET = "\x1b[0m";
 const rgb = (r, g, b) => (text) => `\x1b[38;2;${r};${g};${b}m${text}${RESET}`;
-const claude = rgb(215, 119, 87);
-const warning = rgb(250, 178, 25);
-const critical = rgb(230, 80, 80);
-const ink = rgb(220, 220, 220);
-const muted = rgb(140, 140, 140);
-const faint = rgb(85, 85, 85);
+const accent = rgb(139, 147, 255); // #8b93ff
+const warning = rgb(229, 176, 74); // #e5b04a, à partir de 70 %
+const critical = rgb(229, 103, 90); // #e5675a, à partir de 90 %
+const ink = rgb(236, 235, 231); // #ecebe7
+const muted = rgb(140, 140, 140); // #8c8c8c
+const faint = rgb(85, 85, 85); // #555555
 
 const SEPARATOR = faint("  ·  ");
 const BAR_CELLS = 8;
@@ -343,7 +343,7 @@ async function record(limits) {
 function gauge(name, used, { warnAt, criticalAt, reset }) {
   if (typeof used !== "number" || !Number.isFinite(used)) return null;
   const value = Math.min(100, Math.max(0, used));
-  const tone = value >= criticalAt ? critical : value >= warnAt ? warning : claude;
+  const tone = value >= criticalAt ? critical : value >= warnAt ? warning : accent;
   // Une consommation non nulle remplit toujours au moins une case.
   const filled = value > 0 ? Math.max(1, Math.round((value / 100) * BAR_CELLS)) : 0;
   const bar = tone("▰".repeat(filled)) + faint("▱".repeat(BAR_CELLS - filled));
@@ -371,7 +371,7 @@ const git = await gitStatus(dir);
 const effort = input.effort?.level;
 const model = input.model?.display_name
   ? [
-      `${claude("✻")} ${claude(input.model.display_name)}`,
+      accent(input.model.display_name),
       effort ? muted(`${EFFORT_GLYPHS[effort] ?? "◌"} ${effort}`) : null,
       input.fast_mode ? warning("⚡") : null,
     ]

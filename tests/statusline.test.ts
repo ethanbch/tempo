@@ -64,7 +64,8 @@ describe("statusline", () => {
   it("renders the model, effort, context and limit gauges", () => {
     const { stdout, status } = run(STATUSLINE, limitsInput(6, 35));
     expect(status).toBe(0);
-    expect(stdout).toContain("✻ Opus 5.5 ◑ high");
+    expect(stdout).toContain("Opus 5.5 ◑ high");
+    expect(stdout).not.toContain("✻");
     expect(stdout).toMatch(/ctx ▰{4}▱{4} 52 %/);
     // Une heure pour la session, une durée pour la semaine : la préposition
     // évite de confondre les deux.

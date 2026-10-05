@@ -195,12 +195,12 @@ statusline command:
 ### What the statusline shows
 
 ```
-✻ Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52%  ·  5h ▰▱▱▱▱▱▱▱ 6% ↻ at 20:00  ·  7d ▰▰▰▱▱▱▱▱ 35% ↻ in 3d14h10m
+Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52%  ·  5h ▰▱▱▱▱▱▱▱ 6% ↻ at 20:00  ·  7d ▰▰▰▱▱▱▱▱ 35% ↻ in 3d14h10m
 ```
 
 | Block | Meaning |
 | --- | --- |
-| `✻ Opus 5.5 ◔ medium` | Model and effort level (`○` low → `●` max); `⚡` when fast mode is on |
+| `Opus 5.5 ◔ medium` | Model and effort level (`○` low → `●` max); `⚡` when fast mode is on |
 | `tempo ⎇ main ●` | Folder and git branch; `●` for uncommitted changes, `↑`/`↓` for commits ahead/behind the remote |
 | `ctx` | Context window used — turns yellow at 60 %, red at 80 % |
 | `5h` | 5-hour session used, and the time it resets (`at 20:00`) |
