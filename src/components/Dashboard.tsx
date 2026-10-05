@@ -3,16 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { RangeKey, UsageReport } from "@/lib/aggregate";
-import {
-  bytes,
-  compactTokens,
-  duration,
-  formatDateTime,
-  integer,
-  percent,
-  timeAgo,
-  usd,
-} from "@/lib/format";
+import { LOCALES, LOCALE_NAMES, isLocale } from "@/lib/i18n";
+import { UNSPECIFIED_EFFORT } from "@/lib/insights";
 import { modelLabel } from "@/lib/pricing";
 import { modelSlot } from "@/lib/series";
 import type { LimitsReport } from "@/lib/limits";
@@ -20,6 +12,7 @@ import type { Account } from "@/lib/types";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { RankedBars } from "@/components/charts/RankedBars";
 import { StackedCost } from "@/components/charts/StackedCost";
+import { useI18n } from "@/components/I18nProvider";
 import { Levers } from "@/components/Levers";
 import { QuotaWindows } from "@/components/QuotaWindows";
 import { SessionDetail } from "@/components/SessionDetail";
@@ -33,12 +26,7 @@ const EFFORT_SCALE = ["low", "medium", "high", "xhigh", "max"];
 /** Cadence du rafraîchissement de fond, quand l'onglet est visible. */
 const REFRESH_INTERVAL_MS = 30_000;
 
-const RANGES: Array<{ key: RangeKey; label: string }> = [
-  { key: "24h", label: "24 heures" },
-  { key: "7d", label: "7 jours" },
-  { key: "30d", label: "30 jours" },
-  { key: "all", label: "Tout" },
-];
+const RANGES: RangeKey[] = ["24h", "7d", "30d", "all"];
 
 export function Dashboard({
   initialReport,
@@ -49,6 +37,8 @@ export function Dashboard({
   initialLimits: LimitsReport | null;
   account: Account;
 }) {
+  const { t, f } = useI18n();
+  const { compactTokens, duration, integer, percent, timeAgo, usd } = f;
   const [report, setReport] = useState(initialReport);
   const [limits, setLimits] = useState(initialLimits);
   const [range, setRange] = useState<RangeKey>(initialReport.range);
@@ -90,13 +80,13 @@ export function Dashboard({
       const response = await fetch(`/api/usage?${queryString(nextRange, nextProjectId, nextModel)}`, {
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`réponse ${response.status}`);
+      if (!response.ok) throw new Error(t.common.httpStatus(response.status));
       const payload = (await response.json()) as { report: UsageReport; limits: LimitsReport | null };
       setReport(payload.report);
       setLimits(payload.limits);
     } catch (cause) {
       if (controller.signal.aborted) return;
-      setError(cause instanceof Error ? cause.message : "erreur inconnue");
+      setError(cause instanceof Error ? cause.message : t.common.unknownError);
     } finally {
       lastFetchedAt.current = Date.now();
       if (inFlight.current === controller) inFlight.current = null;
@@ -168,12 +158,12 @@ export function Dashboard({
     label: model.label,
     value: model.cost,
     color: SERIES_VARS[modelSlot(model.model, report.allModels)],
-    caption: `${integer(model.requests)} requêtes`,
+    caption: t.captions.requests(integer(model.requests)),
     detail: [
-      { label: "Coût", value: usd(model.cost) },
-      { label: "Requêtes", value: integer(model.requests) },
-      { label: "Sortie", value: compactTokens(model.outputTokens) },
-      { label: "Lecture cache", value: compactTokens(model.cacheReadTokens) },
+      { label: t.common.cost, value: usd(model.cost) },
+      { label: t.common.requests, value: integer(model.requests) },
+      { label: t.common.output, value: compactTokens(model.outputTokens) },
+      { label: t.common.cacheRead, value: compactTokens(model.cacheReadTokens) },
     ],
   }));
 
@@ -181,15 +171,15 @@ export function Dashboard({
     .filter((entry) => entry.cost > 0)
     .map((entry) => ({
       key: entry.cause,
-      label: entry.label,
+      label: t.causes[entry.cause],
       value: entry.cost,
       // Série nominale : la longueur porte la grandeur, une seule teinte suffit.
       color: SERIES_VARS[0],
-      caption: `${integer(entry.requests)} req · ${compactTokens(entry.tokens)} tokens`,
+      caption: t.captions.requestsTokens(integer(entry.requests), compactTokens(entry.tokens)),
       detail: [
-        { label: "Coût", value: usd(entry.cost) },
-        { label: "Requêtes", value: integer(entry.requests) },
-        { label: "Contexte réécrit", value: compactTokens(entry.tokens) },
+        { label: t.common.cost, value: usd(entry.cost) },
+        { label: t.common.requests, value: integer(entry.requests) },
+        { label: t.captions.contextRewritten, value: compactTokens(entry.tokens) },
       ],
     }));
 
@@ -205,7 +195,7 @@ export function Dashboard({
       const position = EFFORT_SCALE.indexOf(slice.effort);
       return {
         key: slice.effort,
-        label: slice.effort,
+        label: slice.effort === UNSPECIFIED_EFFORT ? t.effortUnspecified : slice.effort,
         value: slice.cost,
         // Échelle ordonnée : une seule teinte, du clair au foncé selon le niveau.
         color:
@@ -214,12 +204,12 @@ export function Dashboard({
               ? 0
               : Math.min(ORDINAL_VARS.length - 1, Math.floor((position / (EFFORT_SCALE.length - 1)) * (ORDINAL_VARS.length - 1)))
           ],
-        caption: `${integer(slice.requests)} req · ${percent(slice.thinkingShare)} raisonnement`,
+        caption: t.captions.requestsReasoning(integer(slice.requests), percent(slice.thinkingShare)),
         detail: [
-          { label: "Coût", value: usd(slice.cost) },
-          { label: "Requêtes", value: integer(slice.requests) },
-          { label: "Sortie", value: compactTokens(slice.outputTokens) },
-          { label: "Raisonnement", value: compactTokens(slice.thinkingTokens) },
+          { label: t.common.cost, value: usd(slice.cost) },
+          { label: t.common.requests, value: integer(slice.requests) },
+          { label: t.common.output, value: compactTokens(slice.outputTokens) },
+          { label: t.common.reasoning, value: compactTokens(slice.thinkingTokens) },
         ],
       };
     });
@@ -230,12 +220,16 @@ export function Dashboard({
     value: project.cost,
     // Série nominale : une seule teinte, la longueur porte déjà la grandeur.
     color: SERIES_VARS[0],
-    caption: `${integer(project.sessions)} sessions · ${integer(project.requests)} req`,
+    caption: t.captions.sessionsRequests(
+      integer(project.sessions),
+      integer(project.requests),
+      project.sessions,
+    ),
     detail: [
-      { label: "Coût", value: usd(project.cost) },
-      { label: "Requêtes", value: integer(project.requests) },
-      { label: "Sessions", value: integer(project.sessions) },
-      { label: "Dernière activité", value: timeAgo(project.lastActivity, now) },
+      { label: t.common.cost, value: usd(project.cost) },
+      { label: t.common.requests, value: integer(project.requests) },
+      { label: t.common.sessions, value: integer(project.sessions) },
+      { label: t.common.lastActivity, value: timeAgo(project.lastActivity, now) },
     ],
   }));
 
@@ -245,12 +239,12 @@ export function Dashboard({
     value: session.cost,
     // Série nominale : une seule teinte, la longueur porte déjà la grandeur.
     color: SERIES_VARS[0],
-    caption: `${integer(session.requests)} req · ${duration(session.durationMs)}`,
+    caption: t.captions.requestsDuration(integer(session.requests), duration(session.durationMs)),
     detail: [
-      { label: "Coût", value: usd(session.cost) },
-      { label: "Requêtes", value: integer(session.requests) },
-      { label: "Durée", value: duration(session.durationMs) },
-      { label: "Dernière activité", value: timeAgo(session.lastActivity, now) },
+      { label: t.common.cost, value: usd(session.cost) },
+      { label: t.common.requests, value: integer(session.requests) },
+      { label: t.common.duration, value: duration(session.durationMs) },
+      { label: t.common.lastActivity, value: timeAgo(session.lastActivity, now) },
     ],
   }));
 
@@ -263,36 +257,36 @@ export function Dashboard({
         <div className="flex flex-wrap items-center gap-2">
           <div
             role="group"
-            aria-label="Période"
+            aria-label={t.filters.period}
             className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1"
           >
             {RANGES.map((option) => {
-              const selected = option.key === range;
+              const selected = option === range;
               return (
                 <button
-                  key={option.key}
+                  key={option}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => void reload(option.key, projectId, model)}
+                  onClick={() => void reload(option, projectId, model)}
                   className={`rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
                     selected
                       ? "bg-[var(--accent)] font-medium text-white"
                       : "text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
                   }`}
                 >
-                  {option.label}
+                  {t.filters.ranges[option]}
                 </button>
               );
             })}
           </div>
 
           <select
-            aria-label="Filtrer par projet"
+            aria-label={t.filters.byProject}
             value={projectId}
             onChange={(event) => void reload(range, event.target.value, model)}
             className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
           >
-            <option value="">Tous les projets</option>
+            <option value="">{t.filters.allProjects}</option>
             {report.allProjects.map((project) => (
               <option key={project.projectId} value={project.projectId}>
                 {project.name}
@@ -301,12 +295,12 @@ export function Dashboard({
           </select>
 
           <select
-            aria-label="Filtrer par modèle"
+            aria-label={t.filters.byModel}
             value={model}
             onChange={(event) => void reload(range, projectId, event.target.value)}
             className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)]"
           >
-            <option value="">Tous les modèles</option>
+            <option value="">{t.filters.allModels}</option>
             {report.allModels.map((id) => (
               <option key={id} value={id}>
                 {modelLabel(id)}
@@ -321,7 +315,7 @@ export function Dashboard({
           aria-pressed={showTable}
           className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
         >
-          {showTable ? "Masquer le tableau" : "Voir le tableau"}
+          {showTable ? t.filters.hideTable : t.filters.showTable}
         </button>
       </div>
 
@@ -331,7 +325,7 @@ export function Dashboard({
           className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px]"
           style={{ color: "var(--status-critical)" }}
         >
-          Rechargement impossible : {error}
+          {t.filters.reloadFailed(error)}
         </p>
       )}
 
@@ -346,62 +340,53 @@ export function Dashboard({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
-            label="Coût équivalent API"
+            label={t.stats.cost}
             value={usd(summary.cost)}
-            hint={
-              account.plan
-                ? `ce que cet usage aurait coûté à l'API, hors abonnement ${account.plan}`
-                : "ce que cet usage aurait coûté à l'API"
-            }
+            hint={account.plan ? t.stats.costHintPlan(account.plan) : t.stats.costHint}
             emphasis
           />
           <StatTile
-            label="Requêtes"
+            label={t.common.requests}
             value={integer(summary.requests)}
-            hint={`${integer(summary.prompts)} prompts · ${integer(summary.sessions)} sessions`}
+            hint={t.stats.requestsHint(integer(summary.prompts), integer(summary.sessions), summary.sessions)}
           />
           <StatTile
-            label="Tokens"
+            label={t.stats.tokens}
             value={compactTokens(summary.totalTokens)}
-            hint={`${compactTokens(summary.outputTokens)} en sortie · ${compactTokens(
-              summary.thinkingTokens,
-            )} de raisonnement`}
+            hint={t.stats.tokensHint(
+              compactTokens(summary.outputTokens),
+              compactTokens(summary.thinkingTokens),
+            )}
           />
           <StatTile
-            label="Servi par le cache"
+            label={t.stats.cache}
             value={percent(summary.cacheHitRate, 1)}
-            hint={`${compactTokens(summary.cacheReadTokens)} tokens relus`}
+            hint={t.stats.cacheHint(compactTokens(summary.cacheReadTokens))}
           />
         </div>
 
         <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[1.35fr_1fr]">
-          <Card
-            title="Coût par jour"
-            subtitle="Ventilé par poste : entrée, écriture et lecture de cache, sortie."
-          >
+          <Card title={t.cards.daily.title} subtitle={t.cards.daily.subtitle}>
             <StackedCost data={report.daily} />
           </Card>
 
-          <Card
-            title="Fenêtres de 5 heures"
-            subtitle="Le quota Claude se recharge par fenêtre glissante ouverte à la première requête."
-          >
+          <Card title={t.cards.quota.title} subtitle={t.cards.quota.subtitle}>
             <QuotaWindows blocks={report.blocks} now={now} />
           </Card>
         </div>
 
         <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
-          <Card title="Par modèle" subtitle="Coût équivalent API sur la période.">
+          <Card title={t.cards.byModel.title} subtitle={t.cards.byModel.subtitle}>
             <RankedBars items={models} formatValue={(value) => usd(value)} />
           </Card>
 
-          <Card title="Par projet" subtitle="Les huit projets les plus coûteux.">
+          <Card title={t.cards.byProject.title} subtitle={t.cards.byProject.subtitle}>
             <RankedBars items={projects} formatValue={(value) => usd(value)} />
           </Card>
         </div>
 
         <div className="mt-4">
-          <Card title="Sessions" subtitle="Les huit sessions les plus coûteuses. Cliquer pour le détail.">
+          <Card title={t.cards.sessions.title} subtitle={t.cards.sessions.subtitle}>
             <RankedBars
               items={sessions}
               formatValue={(value) => usd(value)}
@@ -411,52 +396,40 @@ export function Dashboard({
         </div>
 
         <div className="mt-4">
-          <Card
-            title="Quand tu utilises Claude"
-            subtitle="Requêtes par jour de la semaine et par heure, sur ton fuseau local."
-          >
+          <Card title={t.cards.heatmap.title} subtitle={t.cards.heatmap.subtitle}>
             <ActivityHeatmap cells={report.heatmap} />
           </Card>
         </div>
 
         <div className="mt-4">
-          <Card
-            title="Leviers d'optimisation"
-            subtitle="Ce que tes propres requêtes révèlent, classé par ce qu'il y a à gagner."
-          >
+          <Card title={t.cards.levers.title} subtitle={t.cards.levers.subtitle}>
             <Levers levers={report.insights.levers} />
           </Card>
         </div>
 
         <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
-          <Card
-            title="Écritures de cache, par cause"
-            subtitle="Réenregistrer du contexte se paie : voici ce qui l'a déclenché."
-          >
+          <Card title={t.cards.cacheCauses.title} subtitle={t.cards.cacheCauses.subtitle}>
             <RankedBars
               items={cacheCauses}
               formatValue={(value) => usd(value)}
               labelWidth={172}
-              emptyMessage="Aucune écriture de cache sur cette période."
+              emptyMessage={t.cards.cacheCauses.empty}
             />
           </Card>
 
-          <Card
-            title="Par niveau d'effort"
-            subtitle="Dépense et part du raisonnement, du plus léger au plus soutenu."
-          >
+          <Card title={t.cards.effort.title} subtitle={t.cards.effort.subtitle}>
             <RankedBars
               items={efforts}
               formatValue={(value) => usd(value)}
               labelWidth={172}
-              emptyMessage="Aucun niveau d'effort renseigné sur cette période."
+              emptyMessage={t.cards.effort.empty}
             />
           </Card>
         </div>
 
         {showTable && (
           <div className="mt-4">
-            <Card title="Détail par jour" subtitle="Toutes les valeurs des graphiques, en clair.">
+            <Card title={t.cards.table.title} subtitle={t.cards.table.subtitle}>
               <UsageTable daily={report.daily} />
             </Card>
           </div>
@@ -487,6 +460,7 @@ function ThemeToggle() {
   // `null` (thème système) au premier rendu, des deux côtés : la préférence
   // stockée n'est lue qu'au montage, pour ne jamais désaccorder le HTML
   // serveur de la première passe client.
+  const { t } = useI18n();
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
 
   useEffect(() => {
@@ -509,14 +483,13 @@ function ThemeToggle() {
     }
   }
 
-  const label =
-    theme === "light" ? "Thème clair" : theme === "dark" ? "Thème sombre" : "Thème du système";
+  const label = theme === "light" ? t.theme.light : theme === "dark" ? t.theme.dark : t.theme.system;
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={`${label}, changer de thème`}
+      aria-label={t.theme.change(label)}
       title={label}
       // La préférence stockée n'existe que côté client : l'icône du premier
       // rendu serveur (thème système) peut différer de celle rendue au montage.
@@ -542,7 +515,32 @@ function ThemeToggle() {
   );
 }
 
+/** Sélecteur de langue, appliqué sur place et mémorisé dans un cookie. */
+function LanguagePicker() {
+  const { t, locale, setLocale } = useI18n();
+  return (
+    <select
+      aria-label={t.header.language}
+      title={t.header.language}
+      value={locale}
+      onChange={(event) => {
+        if (isLocale(event.target.value)) setLocale(event.target.value);
+      }}
+      className="h-9 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 text-[13px] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]"
+    >
+      {LOCALES.map((option) => (
+        // Le code suffit à l'œil ; le nom complet reste accessible au survol et
+        // aux lecteurs d'écran.
+        <option key={option} value={option} title={LOCALE_NAMES[option]} aria-label={LOCALE_NAMES[option]}>
+          {option.toUpperCase()}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function Header({ account, report }: { account: Account; report: UsageReport }) {
+  const { t, f } = useI18n();
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -570,26 +568,29 @@ function Header({ account, report }: { account: Account; report: UsageReport }) 
           </h1>
         </div>
         <p className="mt-1.5 text-[13px] text-[var(--ink-secondary)]">
-          Ton usage de Claude Code, lu depuis les transcripts de ta machine.
+          {t.header.tagline}
         </p>
       </div>
 
       <div className="flex items-start gap-3">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-right">
           {account.missing ? (
-            <p className="text-[13px] text-[var(--ink-secondary)]">Aucun compte Claude détecté</p>
+            <p className="text-[13px] text-[var(--ink-secondary)]">{t.header.noAccount}</p>
           ) : (
             <>
               <p className="text-[13px] font-medium text-[var(--ink)]">{account.email}</p>
               <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
-                {account.plan ? `Claude ${account.plan}` : "Compte Claude"}
+                {account.plan ? t.header.plan(account.plan) : t.header.account}
                 {report.summary.lastActivity
-                  ? ` · actif ${timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt))}`
+                  ? ` · ${t.header.active(
+                      f.timeAgo(report.summary.lastActivity, Date.parse(report.meta.scannedAt)),
+                    )}`
                   : ""}
               </p>
             </>
           )}
         </div>
+        <LanguagePicker />
         <ThemeToggle />
       </div>
     </header>
@@ -597,50 +598,36 @@ function Header({ account, report }: { account: Account; report: UsageReport }) 
 }
 
 function Footnotes({ report }: { report: UsageReport }) {
+  const { t, f } = useI18n();
   const { reconciliation, meta, summary } = report;
 
   return (
     <footer className="mt-8 space-y-3 border-t border-[var(--border)] pt-5 text-[12px] leading-relaxed text-[var(--ink-muted)]">
       <p>
-        <strong className="font-medium text-[var(--ink-secondary)]">Comment lire le coût.</strong>{" "}
-        Un abonnement Claude Pro ou Max n&apos;est pas facturé au token : le montant affiché est ce
-        que le même usage aurait coûté à l&apos;API, tarifs publics à l&apos;appui. Il mesure la
-        valeur consommée, pas une dépense réelle.
+        <strong className="font-medium text-[var(--ink-secondary)]">{t.footer.readTitle}</strong>{" "}
+        {t.footer.read}
       </p>
       <p>
-        <strong className="font-medium text-[var(--ink-secondary)]">Comment le coût est calculé.</strong>{" "}
-        Les {usd(reconciliation.rawCost)} de requêtes visibles dans les transcripts sont calibrés
-        session par session sur les relevés que Claude Code écrit en fin de session, ce qui ajoute{" "}
-        {usd(reconciliation.untrackedCost)} d&apos;appels qu&apos;il ne journalise pas — génération
-        de titres, compaction de contexte, tâches utilitaires. {percent(
-          reconciliation.calibratedShare,
-          1,
-        )}{" "}
-        du total affiché est ainsi calibré.
+        <strong className="font-medium text-[var(--ink-secondary)]">{t.footer.computeTitle}</strong>{" "}
+        {t.footer.compute(
+          f.usd(reconciliation.rawCost),
+          f.usd(reconciliation.untrackedCost),
+          f.percent(reconciliation.calibratedShare, 1),
+        )}
         {reconciliation.uncalibratedSessions > 0
-          ? ` ${integer(reconciliation.uncalibratedSessions)} session(s) encore ouverte(s) n'ont pas
-             de relevé : leur coût est un plancher, légèrement sous-estimé.`.replace(/\s+/g, " ")
+          ? t.footer.uncalibrated(f.integer(reconciliation.uncalibratedSessions))
           : ""}
-        {reconciliation.hasUnknownModelCost
-          ? " Une session au moins porte un modèle dont Claude Code ignore le tarif."
-          : ""}
+        {reconciliation.hasUnknownModelCost ? t.footer.unknownModel : ""}
       </p>
       <p>
-        {integer(meta.fileCount)} transcripts · {bytes(meta.byteCount)} lus depuis{" "}
+        {t.footer.files(f.integer(meta.fileCount), f.bytes(meta.byteCount))}{" "}
         <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">{meta.root}</code>
-        {meta.skippedLines > 0 ? ` · ${integer(meta.skippedLines)} lignes illisibles ignorées` : ""}
-        {summary.firstActivity
-          ? ` · historique depuis le ${formatDateTime(summary.firstActivity)}`
-          : ""}
-        {` · scan du ${formatDateTime(meta.scannedAt)}`}
-        {summary.activeDays > 0 ? ` · ${integer(summary.activeDays)} jours actifs` : ""}
+        {meta.skippedLines > 0 ? t.footer.skipped(f.integer(meta.skippedLines)) : ""}
+        {summary.firstActivity ? t.footer.since(f.formatDateTime(summary.firstActivity)) : ""}
+        {t.footer.scanned(f.formatDateTime(meta.scannedAt))}
+        {summary.activeDays > 0 ? t.footer.activeDays(f.integer(summary.activeDays)) : ""}
       </p>
-      <p>
-        Aucune donnée ne quitte ta machine : l&apos;application lit les fichiers locaux et
-        n&apos;appelle aucun service distant. Les jauges de limite viennent du relevé déposé par
-        la statusline de Claude Code. Durée d&apos;une fenêtre de quota :{" "}
-        {duration(5 * 60 * 60 * 1000)}.
-      </p>
+      <p>{t.footer.privacy(f.duration(5 * 60 * 60 * 1000))}</p>
     </footer>
   );
 }

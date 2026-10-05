@@ -17,6 +17,7 @@
  *   TEMPO_LIMITS_PATH        dernier relevé (l'historique est écrit à côté)
  *   TEMPO_ALERT_THRESHOLDS   seuils d'alerte en %, « 80,95 » par défaut, « off » pour couper
  *   TEMPO_ALERT_DRY_RUN      si défini, les alertes sont écrites sur stderr au lieu d'être notifiées
+ *   TEMPO_LANG               langue (en, fr, es, de), sinon celle du terminal, sinon l'anglais
  */
 import { execFile, spawn } from "node:child_process";
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
@@ -36,6 +37,86 @@ const HISTORY_RETENTION_MS = 60 * 24 * 60 * 60 * 1000;
  * même fenêtre : on ne parle de nouvelle fenêtre qu'au-delà de cet écart.
  */
 const SAME_WINDOW_TOLERANCE_MS = 10 * 60 * 1000;
+
+const pad = (value) => String(value).padStart(2, "0");
+
+/**
+ * Textes de la statusline et des alertes. Les échéances portent leur
+ * préposition — « à 20h », « dans 13h30m » — pour qu'on ne confonde jamais une
+ * heure avec une durée.
+ */
+const TEXTS = {
+  en: {
+    week: "7d",
+    day: "d",
+    clock: (hours, minutes) => `${hours}:${pad(minutes)}`,
+    at: (time) => `at ${time}`,
+    in: (remaining) => `in ${remaining}`,
+    percent: (value) => `${value}%`,
+    detached: "detached",
+    sessionName: "session",
+    weekName: "week",
+    alertTitle: (name, value) => `Claude · ${name} at ${value}%`,
+    resetsAt: (time) => `Resets at ${time}`,
+    resetsIn: (remaining) => `Resets in ${remaining}`,
+    unknownReset: "Reset time unknown",
+  },
+  fr: {
+    week: "7j",
+    day: "j",
+    clock: (hours, minutes) => `${hours}h${minutes ? pad(minutes) : ""}`,
+    at: (time) => `à ${time}`,
+    in: (remaining) => `dans ${remaining}`,
+    percent: (value) => `${value} %`,
+    detached: "détachée",
+    sessionName: "session",
+    weekName: "semaine",
+    alertTitle: (name, value) => `Claude · ${name} à ${value} %`,
+    resetsAt: (time) => `Réinitialisation à ${time}`,
+    resetsIn: (remaining) => `Réinitialisation dans ${remaining}`,
+    unknownReset: "Échéance inconnue",
+  },
+  es: {
+    week: "7d",
+    day: "d",
+    clock: (hours, minutes) => `${hours}:${pad(minutes)}`,
+    at: (time) => `a las ${time}`,
+    in: (remaining) => `en ${remaining}`,
+    percent: (value) => `${value} %`,
+    detached: "separada",
+    sessionName: "sesión",
+    weekName: "semana",
+    alertTitle: (name, value) => `Claude · ${name} al ${value} %`,
+    resetsAt: (time) => `Se reinicia a las ${time}`,
+    resetsIn: (remaining) => `Se reinicia en ${remaining}`,
+    unknownReset: "Reinicio desconocido",
+  },
+  de: {
+    week: "7T",
+    day: "T",
+    clock: (hours, minutes) => `${hours}:${pad(minutes)}`,
+    at: (time) => `um ${time}`,
+    in: (remaining) => `in ${remaining}`,
+    percent: (value) => `${value} %`,
+    detached: "losgelöst",
+    sessionName: "Sitzung",
+    weekName: "Woche",
+    alertTitle: (name, value) => `Claude · ${name} bei ${value} %`,
+    resetsAt: (time) => `Zurücksetzung um ${time}`,
+    resetsIn: (remaining) => `Zurücksetzung in ${remaining}`,
+    unknownReset: "Zurücksetzung unbekannt",
+  },
+};
+
+/** Langue : `TEMPO_LANG`, sinon celle du terminal, sinon l'anglais. */
+const T = (() => {
+  const { TEMPO_LANG, LC_ALL, LC_MESSAGES, LANG } = process.env;
+  for (const value of [TEMPO_LANG, LC_ALL, LC_MESSAGES, LANG]) {
+    const code = value?.slice(0, 2).toLowerCase();
+    if (code && code in TEXTS) return TEXTS[code];
+  }
+  return TEXTS.en;
+})();
 
 const ALERT_THRESHOLDS = (() => {
   const raw = process.env.TEMPO_ALERT_THRESHOLDS ?? "80,95";
@@ -94,7 +175,7 @@ function gitStatus(dir) {
             behind = Number(b ?? 0);
           } else if (line && !line.startsWith("#")) dirty = true;
         }
-        resolve({ branch: branch === "(detached)" ? "détachée" : branch, ahead, behind, dirty });
+        resolve({ branch: branch === "(detached)" ? T.detached : branch, ahead, behind, dirty });
       },
     );
   });
@@ -107,10 +188,9 @@ function toDate(resetsAt) {
   return date.getTime() > Date.now() ? date : null;
 }
 
-/** « 16h40 », ou « 16h » pile. */
+/** « 16h40 » ou « 16h » pile en français, « 16:40 » ailleurs. */
 function clock(date) {
-  const minutes = date.getMinutes();
-  return `${date.getHours()}h${minutes ? String(minutes).padStart(2, "0") : ""}`;
+  return T.clock(date.getHours(), date.getMinutes());
 }
 
 /** Heure de réinitialisation de la session : « 16h40 ». */
@@ -127,7 +207,7 @@ function resetCountdown(resetsAt) {
   const days = Math.floor(totalMinutes / 1_440);
   const hours = Math.floor((totalMinutes % 1_440) / 60);
   const minutes = totalMinutes % 60;
-  if (days > 0) return `${days}j${hours}h${minutes}m`;
+  if (days > 0) return `${days}${T.day}${hours}h${minutes}m`;
   if (hours > 0) return `${hours}h${minutes}m`;
   return `${minutes}m`;
 }
@@ -215,8 +295,8 @@ function notify(title, body) {
  */
 function alertOnThresholds(previous, next) {
   const windows = [
-    { key: "five_hour", name: "session", reset: (value) => `Réinitialisation à ${resetClock(value)}` },
-    { key: "seven_day", name: "semaine", reset: (value) => `Réinitialisation dans ${resetCountdown(value)}` },
+    { key: "five_hour", name: T.sessionName, reset: (value) => T.resetsAt(resetClock(value)) },
+    { key: "seven_day", name: T.weekName, reset: (value) => T.resetsIn(resetCountdown(value)) },
   ];
   for (const { key, name, reset } of windows) {
     const current = next[key];
@@ -229,8 +309,8 @@ function alertOnThresholds(previous, next) {
       (threshold) => before < threshold && current.used_percentage >= threshold,
     );
     if (crossed.length === 0) continue;
-    const body = toDate(current.resets_at) ? reset(current.resets_at) : "Échéance inconnue";
-    notify(`Claude · ${name} à ${Math.round(current.used_percentage)} %`, body);
+    const body = toDate(current.resets_at) ? reset(current.resets_at) : T.unknownReset;
+    notify(T.alertTitle(name, Math.round(current.used_percentage)), body);
   }
 }
 
@@ -267,7 +347,7 @@ function gauge(name, used, { warnAt, criticalAt, reset }) {
   // Une consommation non nulle remplit toujours au moins une case.
   const filled = value > 0 ? Math.max(1, Math.round((value / 100) * BAR_CELLS)) : 0;
   const bar = tone("▰".repeat(filled)) + faint("▱".repeat(BAR_CELLS - filled));
-  return [muted(name), bar, tone(`${Math.round(value)} %`), reset ? faint(`↻ ${reset}`) : null]
+  return [muted(name), bar, tone(T.percent(Math.round(value))), reset ? faint(`↻ ${reset}`) : null]
     .filter(Boolean)
     .join(" ");
 }
@@ -319,12 +399,18 @@ const parts = [
   gauge("5h", limits?.five_hour?.used_percentage, {
     warnAt: 70,
     criticalAt: 90,
-    reset: resetClock(limits?.five_hour?.resets_at),
+    reset: (() => {
+      const time = resetClock(limits?.five_hour?.resets_at);
+      return time && T.at(time);
+    })(),
   }),
-  gauge("7j", limits?.seven_day?.used_percentage, {
+  gauge(T.week, limits?.seven_day?.used_percentage, {
     warnAt: 70,
     criticalAt: 90,
-    reset: resetCountdown(limits?.seven_day?.resets_at),
+    reset: (() => {
+      const remaining = resetCountdown(limits?.seven_day?.resets_at);
+      return remaining && T.in(remaining);
+    })(),
   }),
 ].filter(Boolean);
 process.stdout.write(parts.join(SEPARATOR));

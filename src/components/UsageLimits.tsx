@@ -1,29 +1,19 @@
 "use client";
 
+import type { Format } from "@/lib/format";
+import type { Messages } from "@/lib/i18n";
 import type { LimitAnalysis, LimitKind, LimitsReport } from "@/lib/limits";
-import { duration, formatDateTime, formatTime, integer, percent, timeAgo, usd } from "@/lib/format";
+import { useI18n } from "@/components/I18nProvider";
 import { Card } from "@/components/ui";
 
 /** Seuils à partir desquels la jauge change de ton. */
 const WARNING_AT = 0.7;
 const CRITICAL_AT = 0.9;
 
-const LABELS: Record<LimitKind, { title: string; window: string; windows: string; pace: string }> = {
-  session: { title: "Session (5 heures)", window: "session", windows: "sessions", pace: "la dernière heure" },
-  week: { title: "Semaine", window: "semaine", windows: "semaines", pace: "les dernières 24 h" },
-};
-
 function tone(used: number): string {
   if (used >= CRITICAL_AT) return "var(--status-critical)";
   if (used >= WARNING_AT) return "var(--status-warning)";
   return "var(--accent)";
-}
-
-/** Compte à rebours lisible : « 3 j 14 h », « 2 h 13 », « 37 min ». */
-function countdown(ms: number): string {
-  const days = Math.floor(ms / 86_400_000);
-  if (days === 0) return duration(ms);
-  return `${days} j ${Math.floor((ms % 86_400_000) / 3_600_000)} h`;
 }
 
 /**
@@ -118,30 +108,32 @@ function PaceChart({ analysis, now }: { analysis: LimitAnalysis; now: number }) 
   );
 }
 
-function resetText(kind: LimitKind, analysis: LimitAnalysis, now: number): string {
-  if (analysis.expired) return "Réinitialisée depuis le dernier relevé";
-  if (!analysis.resetsAt) return "Échéance inconnue";
-  const remaining = Date.parse(analysis.resetsAt) - now;
+function resetText(kind: LimitKind, analysis: LimitAnalysis, now: number, t: Messages, f: Format) {
+  if (analysis.expired) return t.limits.expired;
+  if (!analysis.resetsAt) return t.limits.unknownReset;
+  const remaining = f.countdown(Date.parse(analysis.resetsAt) - now);
   return kind === "session"
-    ? `Réinitialisation à ${formatTime(analysis.resetsAt)} · dans ${countdown(remaining)}`
-    : `Réinitialisation dans ${countdown(remaining)} · ${formatDateTime(analysis.resetsAt)}`;
+    ? t.limits.sessionReset(f.formatTime(analysis.resetsAt), remaining)
+    : t.limits.weekReset(remaining, f.formatDateTime(analysis.resetsAt));
 }
 
-function paceText(kind: LimitKind, analysis: LimitAnalysis): { text: string; alarming: boolean } | null {
+function paceText(
+  kind: LimitKind,
+  analysis: LimitAnalysis,
+  t: Messages,
+  f: Format,
+): { text: string; alarming: boolean } | null {
   const { projection } = analysis;
   if (!projection) return null;
   if (projection.hitsAt) {
     const when =
-      kind === "session" ? formatTime(projection.hitsAt) : formatDateTime(projection.hitsAt);
-    return { text: `À ce rythme, limite atteinte vers ${when}`, alarming: true };
+      kind === "session" ? f.formatTime(projection.hitsAt) : f.formatDateTime(projection.hitsAt);
+    return { text: t.limits.hitsAt(when), alarming: true };
   }
   if (projection.ratePerHour === 0) {
-    return { text: `Aucune consommation sur ${LABELS[kind].pace}`, alarming: false };
+    return { text: kind === "session" ? t.limits.idleSession : t.limits.idleWeek, alarming: false };
   }
-  return {
-    text: `À ce rythme, ≈ ${percent(projection.usedAtReset)} à la réinitialisation`,
-    alarming: false,
-  };
+  return { text: t.limits.atReset(f.percent(projection.usedAtReset)), alarming: false };
 }
 
 function Gauge({
@@ -153,25 +145,33 @@ function Gauge({
   analysis: LimitAnalysis | null;
   now: number;
 }) {
-  const labels = LABELS[kind];
+  const { t, f } = useI18n();
+  const title = kind === "session" ? t.limits.session : t.limits.week;
   if (!analysis) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border)] p-4">
-        <p className="text-[13px] text-[var(--ink-secondary)]">{labels.title}</p>
-        <p className="mt-1.5 text-[13px] text-[var(--ink-muted)]">Pas encore de relevé.</p>
+        <p className="text-[13px] text-[var(--ink-secondary)]">{title}</p>
+        <p className="mt-1.5 text-[13px] text-[var(--ink-muted)]">{t.limits.noReading}</p>
       </div>
     );
   }
 
   const { used, cap } = analysis;
-  const pace = paceText(kind, analysis);
+  const pace = paceText(kind, analysis, t, f);
+  const capText = cap
+    ? (kind === "session" ? t.limits.capSession : t.limits.capWeek)(
+        f.usd(cap.costPerPercent, true),
+        f.usd(cap.capCost),
+        cap.windows,
+      )
+    : t.limits.noCap;
 
   return (
     <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-sunken)] p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[13px] text-[var(--ink-secondary)]">{labels.title}</p>
+        <p className="text-[13px] text-[var(--ink-secondary)]">{title}</p>
         <p className="tabular text-[26px] font-semibold leading-tight text-[var(--ink)]">
-          {percent(used)}
+          {f.percent(used)}
         </p>
       </div>
       <div
@@ -181,14 +181,14 @@ function Gauge({
         aria-valuenow={Math.round(used * 100)}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${labels.title} : part consommée`}
+        aria-label={t.limits.meterLabel(title)}
       >
         <div
           className="h-full rounded-full transition-[width]"
           style={{ width: `${used > 0 ? Math.max(1, used * 100) : 0}%`, background: tone(used) }}
         />
       </div>
-      <p className="mt-1.5 text-[12px] text-[var(--ink-muted)]">{resetText(kind, analysis, now)}</p>
+      <p className="mt-1.5 text-[12px] text-[var(--ink-muted)]">{resetText(kind, analysis, now, t, f)}</p>
 
       <PaceChart analysis={analysis} now={now} />
 
@@ -201,15 +201,7 @@ function Gauge({
             {pace.text}
           </p>
         )}
-        <p className="text-[var(--ink-muted)]">
-          {cap
-            ? `1 % ≈ ${usd(cap.costPerPercent, true)} · ${labels.window} complète ≈ ${usd(
-                cap.capCost,
-              )} en équivalent API, d'après ${integer(cap.windows)} ${
-                cap.windows > 1 ? labels.windows : labels.window
-              }`
-            : "Plafond estimé : pas encore assez de données"}
-        </p>
+        <p className="text-[var(--ink-muted)]">{capText}</p>
       </div>
     </div>
   );
@@ -224,12 +216,13 @@ function Gauge({
  * transcripts.
  */
 export function UsageLimits({ limits, now }: { limits: LimitsReport | null; now: number }) {
+  const { t, f } = useI18n();
+
   if (!limits) {
     return (
-      <Card title="Limites d'usage">
+      <Card title={t.limits.title}>
         <div className="text-[13px] leading-relaxed text-[var(--ink-secondary)]">
-          Les jauges de session et de semaine s&apos;affichent une fois la statusline de Tempo
-          installée. Depuis le dossier de Tempo :
+          {t.limits.setup}
           <pre className="mt-2 overflow-x-auto rounded-lg bg-[var(--surface-sunken)] p-3 text-[12px]">
             npm run setup:statusline
           </pre>
@@ -239,17 +232,13 @@ export function UsageLimits({ limits, now }: { limits: LimitsReport | null; now:
   }
 
   return (
-    <Card
-      title="Limites d'usage"
-      subtitle="Relevées par la statusline Claude Code. Le plafond estimé rapporte le coût des requêtes Claude Code de cette machine au pourcentage consommé : l'usage sur claude.ai ou ailleurs compte aussi dans la limite, le plafond réel est alors plus haut."
-    >
+    <Card title={t.limits.title} subtitle={t.limits.subtitle}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Gauge kind="session" analysis={limits.session} now={now} />
         <Gauge kind="week" analysis={limits.week} now={now} />
       </div>
       <p className="mt-2 text-right text-[12px] text-[var(--ink-muted)]">
-        Dernier relevé {timeAgo(limits.capturedAt, now)} · {integer(limits.historySize)} relevés en
-        historique
+        {t.limits.lastReading(f.timeAgo(limits.capturedAt, now), f.integer(limits.historySize))}
       </p>
     </Card>
   );

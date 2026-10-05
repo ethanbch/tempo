@@ -1,37 +1,54 @@
 import { readAccount } from "@/lib/account";
 import { buildReport } from "@/lib/aggregate";
+import { getMessages } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
 import { loadLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
 import { Dashboard } from "@/components/Dashboard";
+import { I18nProvider } from "@/components/I18nProvider";
 
 /** Le rapport dépend de fichiers locaux qui changent en continu. */
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const [scan, account] = await Promise.all([scanUsage(), readAccount()]);
+  const [scan, account, locale] = await Promise.all([
+    scanUsage(),
+    readAccount(),
+    getRequestLocale(),
+  ]);
   const limits = await loadLimits(scan);
   const report = buildReport(scan, "7d");
 
   if (scan.fileCount === 0) {
-    return <NoTranscripts root={scan.root} />;
+    return <NoTranscripts root={scan.root} text={getMessages(locale).noTranscripts} />;
   }
 
-  return <Dashboard initialReport={report} initialLimits={limits} account={account} />;
+  return (
+    <I18nProvider initialLocale={locale}>
+      <Dashboard initialReport={report} initialLimits={limits} account={account} />
+    </I18nProvider>
+  );
 }
 
-function NoTranscripts({ root }: { root: string }) {
+function NoTranscripts({
+  root,
+  text,
+}: {
+  root: string;
+  text: ReturnType<typeof getMessages>["noTranscripts"];
+}) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[560px] flex-col justify-center px-6 py-16">
-      <h1 className="text-[22px] font-semibold text-[var(--ink)]">Aucun transcript trouvé</h1>
+      <h1 className="text-[22px] font-semibold text-[var(--ink)]">{text.title}</h1>
       <p className="mt-3 text-[14px] leading-relaxed text-[var(--ink-secondary)]">
-        Tempo lit l&apos;usage de Claude Code depuis les transcripts locaux, attendus dans{" "}
-        <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 text-[13px]">{root}</code>.
-        Ce répertoire est vide ou introuvable.
+        {text.body}{" "}
+        <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 text-[13px]">{root}</code>.{" "}
+        {text.empty}
       </p>
       <ul className="mt-4 space-y-2 text-[14px] leading-relaxed text-[var(--ink-secondary)]">
-        <li>· Lance au moins une session Claude Code sur cette machine.</li>
+        <li>· {text.runSession}</li>
         <li>
-          · Ou pointe Tempo ailleurs avec la variable d&apos;environnement{" "}
+          · {text.pointElsewhere}{" "}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 text-[13px]">
             CLAUDE_PROJECTS_PATH
           </code>

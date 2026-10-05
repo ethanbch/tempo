@@ -1,4 +1,4 @@
-import { canonicalModelId, modelLabel } from "./pricing";
+import { canonicalModelId } from "./pricing";
 import type { UsageEvent } from "./types";
 
 /**
@@ -30,18 +30,9 @@ export type RebuildCause =
   | "model-switch"
   | "effort-switch";
 
-const CAUSE_LABELS: Record<RebuildCause, string> = {
-  "context-growth": "Croissance du contexte",
-  "idle-timeout": "Reprise après pause",
-  "session-start": "Ouverture de session",
-  "model-switch": "Changement de modèle",
-  "effort-switch": "Changement d'effort",
-};
-
 /** Ce qui a provoqué une écriture de cache, et ce qu'elle a coûté. */
 export interface CacheRebuild {
   cause: RebuildCause;
-  label: string;
   requests: number;
   tokens: number;
   cost: number;
@@ -49,6 +40,7 @@ export interface CacheRebuild {
 
 /** Dépense et raisonnement pour un niveau d'effort donné. */
 export interface EffortSlice {
+  /** Niveau d'effort, ou `UNSPECIFIED_EFFORT` quand la requête n'en porte pas. */
   effort: string;
   requests: number;
   cost: number;
@@ -58,20 +50,30 @@ export interface EffortSlice {
   thinkingShare: number;
 }
 
-export interface Lever {
-  id: string;
+export const UNSPECIFIED_EFFORT = "unspecified";
+
+interface LeverBase {
   /** `free` : gain sans contrepartie. `tradeoff` : échange coût contre qualité. */
   kind: "free" | "tradeoff";
-  title: string;
   /** Surcoût identifié pour un gain, dépense concernée pour un arbitrage. */
   amount: number;
   /** Part du coût total de la période, entre 0 et 1. */
   share: number;
-  /** Ce que disent les données. */
-  finding: string;
-  /** Ce qu'il est possible de faire. */
-  action: string;
 }
+
+/**
+ * Un levier et les faits qui le fondent. Les phrases qui les racontent sont
+ * écrites par l'interface, dans la langue choisie.
+ */
+export type Lever = LeverBase &
+  (
+    | { id: "idle-timeout"; requests: number; tokens: number }
+    | { id: "cache-invalidation"; switches: Array<{ cause: RebuildCause; requests: number }> }
+    | { id: "long-context"; requests: number; thresholdTokens: number; peakTokens: number }
+    | { id: "sidechains" }
+    | { id: "effort"; thinkingShare: number }
+    | { id: "model-mix"; model: string; requests: number }
+  );
 
 export interface Insights {
   cacheRebuilds: CacheRebuild[];
@@ -94,23 +96,6 @@ export interface Insights {
   sidechainCost: number;
   webSearchRequests: number;
   totalCost: number;
-}
-
-function compactTokens(value: number): string {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} k`;
-  }
-  return `${Math.round(value)}`;
-}
-
-function money(value: number): string {
-  return `${value.toLocaleString("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} $`;
 }
 
 /**
@@ -159,7 +144,7 @@ function attributeCacheRebuilds(
   const add = (cause: RebuildCause, tokens: number, cost: number) => {
     let entry = totals.get(cause);
     if (!entry) {
-      entry = { cause, label: CAUSE_LABELS[cause], requests: 0, tokens: 0, cost: 0 };
+      entry = { cause, requests: 0, tokens: 0, cost: 0 };
       totals.set(cause, entry);
     }
     entry.requests += 1;
@@ -191,7 +176,7 @@ function groupByEffort(
   const slices = new Map<string, EffortSlice>();
 
   for (const event of events) {
-    const effort = event.effort ?? "non précisé";
+    const effort = event.effort ?? UNSPECIFIED_EFFORT;
     let slice = slices.get(effort);
     if (!slice) {
       slice = {
@@ -238,17 +223,10 @@ function buildLevers(
     levers.push({
       id: "idle-timeout",
       kind: "free",
-      title: "Contexte repayé après une pause",
       amount: idle.cost,
       share: share(idle.cost),
-      finding:
-        `${idle.requests} reprise${idle.requests > 1 ? "s" : ""} après une pause ont réécrit ` +
-        `${compactTokens(idle.tokens)} tokens de contexte, pour ${money(idle.cost)}.`,
-      action:
-        "Une entrée de cache expire après une heure d'inactivité. Reprendre une " +
-        "session longue après une pause fait repayer tout son contexte au prix fort. " +
-        "Mieux vaut enchaîner les tours d'une même tâche, et repartir d'une session " +
-        "neuve plutôt que réveiller une session déjà lourde.",
+      requests: idle.requests,
+      tokens: idle.tokens,
     });
   }
 
@@ -257,18 +235,12 @@ function buildLevers(
   );
   const switchCost = switches.reduce((sum, entry) => sum + entry.cost, 0);
   if (switchCost > 0) {
-    const parts = switches.map((entry) => `${entry.label.toLowerCase()} (${entry.requests})`);
     levers.push({
       id: "cache-invalidation",
       kind: "free",
-      title: "Cache invalidé en cours de session",
       amount: switchCost,
       share: share(switchCost),
-      finding: `${money(switchCost)} de contexte réécrit après : ${parts.join(", ")}.`,
-      action:
-        "Changer de modèle ou de niveau d'effort au milieu d'une session invalide " +
-        "le cache et fait repayer l'historique entier. Autant fixer les deux en " +
-        "début de session, ou changer au moment d'en ouvrir une nouvelle.",
+      switches: switches.map((entry) => ({ cause: entry.cause, requests: entry.requests })),
     });
   }
 
@@ -276,21 +248,11 @@ function buildLevers(
     levers.push({
       id: "long-context",
       kind: "free",
-      title: "Contexte au-delà du seuil de confort",
       amount: insights.longContextExcessCost,
       share: share(insights.longContextExcessCost),
-      finding:
-        `${insights.longContextRequests} requêtes ont relu plus de ` +
-        `${compactTokens(LONG_CONTEXT_TOKENS)} tokens de contexte. Relire ce qui ` +
-        `dépasse ce seuil a coûté ${money(insights.longContextExcessCost)}. Pic ` +
-        `observé : ${compactTokens(insights.peakContextTokens)} tokens en une requête.`,
-      action:
-        "Chaque tour renvoie tout l'historique : le coût d'une session croît à peu " +
-        "près comme le carré du nombre de tours. Compacter le contexte, ou découper " +
-        "en plusieurs sessions ciblées, casse cette courbe. Le montant indiqué est " +
-        `ce qu'aurait évité un compactage systématique à ${compactTokens(
-          LONG_CONTEXT_TOKENS,
-        )} tokens — le contexte sous ce seuil, lui, est le travail lui-même.`,
+      requests: insights.longContextRequests,
+      thresholdTokens: LONG_CONTEXT_TOKENS,
+      peakTokens: insights.peakContextTokens,
     });
   }
 
@@ -298,14 +260,8 @@ function buildLevers(
     levers.push({
       id: "sidechains",
       kind: "free",
-      title: "Coût des sous-agents",
       amount: insights.sidechainCost,
       share: share(insights.sidechainCost),
-      finding: `${money(insights.sidechainCost)} dépensés par des sous-agents.`,
-      action:
-        "Un sous-agent part avec son propre contexte : utile pour isoler une " +
-        "recherche volumineuse de la conversation principale, coûteux si la tâche " +
-        "tenait dans le fil courant.",
     });
   }
 
@@ -317,19 +273,9 @@ function buildLevers(
     levers.push({
       id: "effort",
       kind: "tradeoff",
-      title: "Niveau d'effort",
       amount: effortSpend,
       share: share(effortSpend),
-      finding:
-        `${money(effortSpend)} de dépense à effort élevé. Le raisonnement occupe ` +
-        `${(insights.thinkingShare * 100).toLocaleString("fr-FR", {
-          maximumFractionDigits: 1,
-        })} % des tokens de sortie.`,
-      action:
-        "L'effort est le premier levier qui échange du coût contre de la " +
-        "réflexion. Le codage et les tâches longues le rentabilisent ; les " +
-        "questions courtes et le travail routinier tiennent souvent à effort " +
-        "réduit. À régler par type de tâche, pas globalement.",
+      thinkingShare: insights.thinkingShare,
     });
   }
 
@@ -339,17 +285,10 @@ function buildLevers(
     levers.push({
       id: "model-mix",
       kind: "tradeoff",
-      title: "Répartition entre modèles",
       amount: top[1].cost,
       share: share(top[1].cost),
-      finding:
-        `${modelLabel(top[0])} concentre ${(share(top[1].cost) * 100).toLocaleString("fr-FR", {
-          maximumFractionDigits: 0,
-        })} % de la dépense, sur ${top[1].requests} requêtes.`,
-      action:
-        "Un modèle plus cher qui finit en moins de tours reste l'option la moins " +
-        "chère : ce qui compte est le coût par tâche menée à bout, pas par token. " +
-        "Le basculement se juge tâche par tâche, en observant si le résultat tient.",
+      model: top[0],
+      requests: top[1].requests,
     });
   }
 

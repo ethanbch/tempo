@@ -1,7 +1,7 @@
 "use client";
 
 import type { DailyPoint } from "@/lib/aggregate";
-import { compactTokens, formatDayLong, integer, usd } from "@/lib/format";
+import { useI18n } from "@/components/I18nProvider";
 
 /**
  * Vue tableau des séries journalières.
@@ -11,6 +11,8 @@ import { compactTokens, formatDayLong, integer, usd } from "@/lib/format";
  * secours où chaque valeur reste lisible sans survol ni distinction de couleur.
  */
 export function UsageTable({ daily }: { daily: DailyPoint[] }) {
+  const { t, f } = useI18n();
+  const { compactTokens, formatDayLong, integer, usd } = f;
   const rows = [...daily].reverse();
   const totals = daily.reduce(
     (accumulator, point) => ({
@@ -35,30 +37,30 @@ export function UsageTable({ daily }: { daily: DailyPoint[] }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-[13px]">
         <caption className="sr-only">
-          Usage par jour : requêtes, tokens par type et coût équivalent API
+          {t.table.caption}
         </caption>
         <thead>
           <tr className="border-b border-[var(--border)] text-left text-[12px] text-[var(--ink-muted)]">
             <th scope="col" className="py-2 pr-4 font-medium">
-              Jour
+              {t.common.day}
             </th>
             <th scope="col" className="py-2 pr-4 text-right font-medium">
-              Requêtes
+              {t.common.requests}
             </th>
             <th scope="col" className="py-2 pr-4 text-right font-medium">
-              Entrée
+              {t.common.input}
             </th>
             <th scope="col" className="py-2 pr-4 text-right font-medium">
-              Écriture cache
+              {t.common.cacheWrite}
             </th>
             <th scope="col" className="py-2 pr-4 text-right font-medium">
-              Lecture cache
+              {t.common.cacheRead}
             </th>
             <th scope="col" className="py-2 pr-4 text-right font-medium">
-              Sortie
+              {t.common.output}
             </th>
             <th scope="col" className="py-2 text-right font-medium">
-              Coût
+              {t.common.cost}
             </th>
           </tr>
         </thead>
@@ -92,7 +94,7 @@ export function UsageTable({ daily }: { daily: DailyPoint[] }) {
         <tfoot>
           <tr className="border-t-2 border-[var(--border-strong)] font-medium">
             <th scope="row" className="py-2 pr-4 text-left">
-              Total
+              {t.common.total}
             </th>
             <td className="tabular py-2 pr-4 text-right">{integer(totals.requests)}</td>
             <td className="tabular py-2 pr-4 text-right">{compactTokens(totals.inputTokens)}</td>

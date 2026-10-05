@@ -23,9 +23,9 @@ export async function GET(request: Request) {
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: `Lecture des transcripts impossible : ${message}` },
+      { error: `Could not read transcripts: ${message}` },
       { status: 500 },
     );
   }

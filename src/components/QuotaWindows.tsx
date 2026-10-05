@@ -2,7 +2,7 @@
 
 import type { QuotaBlock } from "@/lib/aggregate";
 import { QUOTA_WINDOW_MS } from "@/lib/aggregate";
-import { compactTokens, duration, formatDateTime, integer, percent, usd } from "@/lib/format";
+import { useI18n } from "@/components/I18nProvider";
 import { EmptyState } from "@/components/ui";
 
 /**
@@ -15,8 +15,11 @@ import { EmptyState } from "@/components/ui";
  * mesurable, plutôt qu'un pourcentage d'un plafond inconnu.
  */
 export function QuotaWindows({ blocks, now }: { blocks: QuotaBlock[]; now: number }) {
+  const { t, f } = useI18n();
+  const { compactTokens, duration, formatDateTime, integer, percent, usd } = f;
+
   if (blocks.length === 0) {
-    return <EmptyState message="Aucune fenêtre d'activité sur cette période." />;
+    return <EmptyState message={t.quota.empty} />;
   }
 
   const peak = Math.max(...blocks.map((block) => block.cost));
@@ -38,13 +41,13 @@ export function QuotaWindows({ blocks, now }: { blocks: QuotaBlock[]; now: numbe
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ background: "var(--status-good)" }}
               />
-              <span className="text-[13px] font-medium text-[var(--ink)]">Fenêtre en cours</span>
+              <span className="text-[13px] font-medium text-[var(--ink)]">{t.quota.current}</span>
               <span className="text-[12px] text-[var(--ink-muted)]">
-                ouverte {duration(elapsed)} · il reste {duration(remaining)}
+                {t.quota.openFor(duration(elapsed), duration(remaining))}
               </span>
             </div>
             <span className="tabular text-[13px] text-[var(--ink-secondary)]">
-              {integer(active.requests)} requêtes · {compactTokens(active.totalTokens)} tokens
+              {t.quota.volume(integer(active.requests), compactTokens(active.totalTokens))}
             </span>
           </div>
 
@@ -60,7 +63,7 @@ export function QuotaWindows({ blocks, now }: { blocks: QuotaBlock[]; now: numbe
               aria-valuenow={Math.round(share * 100)}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Poids de la fenêtre en cours, comparé à la fenêtre la plus chargée"
+              aria-label={t.quota.meterLabel}
             >
               <div
                 className="h-full rounded-full"
@@ -68,14 +71,13 @@ export function QuotaWindows({ blocks, now }: { blocks: QuotaBlock[]; now: numbe
               />
             </div>
             <p className="mt-1.5 text-[12px] text-[var(--ink-muted)]">
-              {percent(share)} de ta fenêtre la plus chargée ({usd(peak)})
+              {t.quota.ofPeak(percent(share), usd(peak))}
             </p>
           </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-[13px] text-[var(--ink-secondary)]">
-          Aucune fenêtre ouverte. La prochaine requête en démarrera une nouvelle, valable{" "}
-          {duration(QUOTA_WINDOW_MS)}.
+          {t.quota.none(duration(QUOTA_WINDOW_MS))}
         </div>
       )}
 

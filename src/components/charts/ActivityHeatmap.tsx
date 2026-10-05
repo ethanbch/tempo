@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { HeatCell } from "@/lib/aggregate";
-import { integer, usd } from "@/lib/format";
+import { useI18n } from "@/components/I18nProvider";
 import {
   ChartTooltip,
   EmptyState,
@@ -12,7 +12,8 @@ import {
   useMeasure,
 } from "@/components/ui";
 
-const WEEKDAYS = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+/** Jours de la semaine, 0 = lundi : leurs libellés viennent de la langue choisie. */
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const ROW_LABEL_WIDTH = 34;
@@ -29,11 +30,13 @@ const CELL_GAP = 2;
 export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
   const { ref, width } = useMeasure<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const { t, f } = useI18n();
+  const { integer, usd } = f;
 
   const byKey = new Map(cells.map((cell) => [`${cell.weekday}-${cell.hour}`, cell]));
   const max = Math.max(...cells.map((cell) => cell.requests), 0);
 
-  if (max === 0) return <EmptyState message="Aucune activité à répartir sur cette période." />;
+  if (max === 0) return <EmptyState message={t.charts.heatmapEmpty} />;
 
   const gridWidth = Math.max(0, width - ROW_LABEL_WIDTH);
   const cellWidth = gridWidth / HOURS.length;
@@ -54,7 +57,7 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
             width={width}
             height={height}
             role="img"
-            aria-label="Requêtes par jour de la semaine et par heure"
+            aria-label={t.charts.heatmapAria}
           >
             {WEEKDAYS.map((day, weekday) => (
               <text
@@ -65,7 +68,7 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
                 fontSize={11}
                 fill="var(--ink-muted)"
               >
-                {day}
+                {f.weekday(day)}
               </text>
             ))}
 
@@ -91,10 +94,10 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
                       setTooltip({
                         x: x + cellWidth / 2,
                         y: box ? y + ROW_HEIGHT / 2 : y,
-                        title: `${WEEKDAYS[weekday]} · ${`${hour}`.padStart(2, "0")} h`,
+                        title: `${f.weekday(weekday)} · ${f.hourOfDay(hour)}`,
                         rows: [
-                          { label: "Requêtes", value: integer(requests) },
-                          { label: "Coût", value: usd(cell?.cost ?? 0, true) },
+                          { label: t.common.requests, value: integer(requests) },
+                          { label: t.common.cost, value: usd(cell?.cost ?? 0, true) },
                         ],
                       });
                     }}
@@ -103,10 +106,10 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
                       setTooltip({
                         x: x + cellWidth / 2,
                         y: y + ROW_HEIGHT / 2,
-                        title: `${WEEKDAYS[weekday]} · ${`${hour}`.padStart(2, "0")} h`,
+                        title: `${f.weekday(weekday)} · ${f.hourOfDay(hour)}`,
                         rows: [
-                          { label: "Requêtes", value: integer(requests) },
-                          { label: "Coût", value: usd(cell?.cost ?? 0, true) },
+                          { label: t.common.requests, value: integer(requests) },
+                          { label: t.common.cost, value: usd(cell?.cost ?? 0, true) },
                         ],
                       })
                     }
@@ -133,7 +136,7 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-[11px] text-[var(--ink-muted)]">moins</span>
+        <span className="text-[11px] text-[var(--ink-muted)]">{t.charts.less}</span>
         {RAMP_VARS.map((color) => (
           <span
             key={color}
@@ -143,7 +146,7 @@ export function ActivityHeatmap({ cells }: { cells: HeatCell[] }) {
           />
         ))}
         <span className="text-[11px] text-[var(--ink-muted)]">
-          plus · jusqu’à {integer(max)} requêtes
+          {t.charts.more(integer(max))}
         </span>
       </div>
     </div>

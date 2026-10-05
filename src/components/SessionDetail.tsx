@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { compactTokens, duration, formatDateTime, usd } from "@/lib/format";
-
-const CAUSE_LABELS: Record<string, string> = {
-  "session-start": "Ouverture de session",
-  "context-growth": "Croissance du contexte",
-  "idle-timeout": "Reprise après pause",
-  "model-switch": "Changement de modèle",
-  "effort-switch": "Changement d'effort",
-};
+import type { RebuildCause } from "@/lib/insights";
+import { useI18n } from "@/components/I18nProvider";
 
 interface SessionRequest {
   time: string;
@@ -22,7 +15,7 @@ interface SessionRequest {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   cost: number;
-  cacheCause: string | null;
+  cacheCause: RebuildCause | null;
 }
 
 interface SessionData {
@@ -45,6 +38,8 @@ interface SessionData {
  * principal, pour garder ce dernier léger.
  */
 export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const { t, f } = useI18n();
+  const { compactTokens, duration, formatDateTime, usd } = f;
   const [data, setData] = useState<SessionData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,23 +50,23 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
       .then(async (response) => {
         const payload = await response.json();
         if (cancelled) return;
-        if (!response.ok) throw new Error(payload.error ?? `réponse ${response.status}`);
+        if (!response.ok) throw new Error(t.common.httpStatus(response.status));
         setData(payload.session as SessionData);
       })
       .catch((cause) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "erreur inconnue");
+        if (!cancelled) setError(cause instanceof Error ? cause.message : t.common.unknownError);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Détail de la session"
+      aria-label={t.session.title}
       className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8"
       onClick={onClose}
     >
@@ -80,34 +75,34 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-[15px] font-semibold text-[var(--ink)]">Détail de la session</h2>
+          <h2 className="text-[15px] font-semibold text-[var(--ink)]">{t.session.title}</h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t.session.close}
             className="rounded-lg px-2 py-1 text-[13px] text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
           >
-            Fermer
+            {t.session.close}
           </button>
         </div>
 
         {error && (
           <p role="alert" className="mt-4 text-[13px]" style={{ color: "var(--status-critical)" }}>
-            Chargement impossible : {error}
+            {t.session.loadFailed(error)}
           </p>
         )}
 
         {!data && !error && (
-          <p className="mt-4 text-[13px] text-[var(--ink-secondary)]">Chargement…</p>
+          <p className="mt-4 text-[13px] text-[var(--ink-secondary)]">{t.session.loading}</p>
         )}
 
         {data && (
           <>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Projet" value={data.projectName} />
-              <Stat label="Coût" value={usd(data.cost)} />
-              <Stat label="Durée" value={duration(data.durationMs)} />
-              <Stat label="Requêtes" value={`${data.requests.length}`} />
+              <Stat label={t.common.project} value={data.projectName} />
+              <Stat label={t.common.cost} value={usd(data.cost)} />
+              <Stat label={t.common.duration} value={duration(data.durationMs)} />
+              <Stat label={t.common.requests} value={f.integer(data.requests.length)} />
             </div>
 
             <ul className="mt-5 space-y-2">
@@ -119,17 +114,17 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                     <span className="text-[13px] font-medium text-[var(--ink)]">
                       {request.label}
-                      {request.effort ? ` · effort ${request.effort}` : ""}
+                      {request.effort ? ` · ${t.session.effort(request.effort)}` : ""}
                     </span>
                     <span className="tabular text-[13px] font-semibold text-[var(--ink)]">
                       {usd(request.cost)}
                     </span>
                   </div>
                   <p className="mt-0.5 text-[12px] text-[var(--ink-muted)]">
-                    {formatDateTime(request.time)} · {compactTokens(request.outputTokens)} sortie ·{" "}
-                    {compactTokens(request.cacheReadTokens)} relus
+                    {formatDateTime(request.time)} · {t.session.output(compactTokens(request.outputTokens))}{" "}
+                    · {t.session.reread(compactTokens(request.cacheReadTokens))}
                     {request.cacheCause
-                      ? ` · cache réécrit : ${CAUSE_LABELS[request.cacheCause] ?? request.cacheCause}`
+                      ? ` · ${t.session.cacheRewritten(t.causes[request.cacheCause])}`
                       : ""}
                   </p>
                 </li>

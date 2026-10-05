@@ -11,14 +11,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const sessionId = new URL(request.url).searchParams.get("id");
   if (!sessionId) {
-    return NextResponse.json({ error: "Paramètre `id` manquant." }, { status: 400 });
+    return NextResponse.json({ error: "Missing `id` parameter." }, { status: 400 });
   }
 
   try {
     const scan = await scanUsage();
     const events = scan.events.filter((event) => event.sessionId === sessionId);
     if (events.length === 0) {
-      return NextResponse.json({ error: "Session introuvable." }, { status: 404 });
+      return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
 
     const calibration = buildCalibration(scan);
@@ -62,9 +62,9 @@ export async function GET(request: Request) {
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: `Lecture des transcripts impossible : ${message}` },
+      { error: `Could not read transcripts: ${message}` },
       { status: 500 },
     );
   }

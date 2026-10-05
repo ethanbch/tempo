@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import type { CostParts, DailyPoint } from "@/lib/aggregate";
-import { formatDay, formatDayLong, niceTicks, usd, usdAxis } from "@/lib/format";
+import { niceTicks } from "@/lib/format";
+import { useI18n } from "@/components/I18nProvider";
 import {
   BAR_RADIUS,
   ChartTooltip,
@@ -17,15 +18,17 @@ import {
   useMeasure,
 } from "@/components/ui";
 
-/** Les quatre postes de dépense, dans l'ordre d'empilement (bas vers haut). */
+/**
+ * Les quatre postes de dépense, dans l'ordre d'empilement (bas vers haut). Leur
+ * clé est aussi celle de leur libellé dans les traductions.
+ */
 const SERIES = [
-  { key: "input", label: "Entrée", color: SERIES_VARS[0] },
-  { key: "cacheWrite", label: "Écriture cache", color: SERIES_VARS[1] },
-  { key: "cacheRead", label: "Lecture cache", color: SERIES_VARS[2] },
-  { key: "output", label: "Sortie", color: SERIES_VARS[3] },
+  { key: "input", color: SERIES_VARS[0] },
+  { key: "cacheWrite", color: SERIES_VARS[1] },
+  { key: "cacheRead", color: SERIES_VARS[2] },
+  { key: "output", color: SERIES_VARS[3] },
 ] as const satisfies ReadonlyArray<{
   key: keyof CostParts;
-  label: string;
   color: string;
 }>;
 
@@ -36,9 +39,11 @@ export function StackedCost({ data }: { data: DailyPoint[] }) {
   const { ref, width } = useMeasure<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
+  const { t, f } = useI18n();
+  const { formatDay, formatDayLong, usd, usdAxis } = f;
 
   if (data.length === 0) {
-    return <EmptyState message="Aucune requête sur cette période." />;
+    return <EmptyState message={t.charts.noRequests} />;
   }
 
   const plotWidth = Math.max(0, width - MARGIN.left - MARGIN.right);
@@ -60,7 +65,7 @@ export function StackedCost({ data }: { data: DailyPoint[] }) {
       .reverse()
       .filter((series) => point.costParts[series.key] > 0)
       .map((series) => ({
-        label: series.label,
+        label: t.common[series.key],
         value: usd(point.costParts[series.key], true),
         color: series.color,
       }));
@@ -70,8 +75,8 @@ export function StackedCost({ data }: { data: DailyPoint[] }) {
       title: `${formatDayLong(point.date)} · ${usd(point.cost)}`,
       rows:
         rows.length > 0
-          ? [...rows, { label: "Requêtes", value: String(point.requests) }]
-          : [{ label: "Aucune requête", value: "0" }],
+          ? [...rows, { label: t.common.requests, value: f.integer(point.requests) }]
+          : [{ label: t.charts.noRequest, value: "0" }],
     });
     setFocused(index);
   };
@@ -89,7 +94,7 @@ export function StackedCost({ data }: { data: DailyPoint[] }) {
             width={width}
             height={HEIGHT}
             role="img"
-            aria-label="Coût équivalent API par jour, ventilé par poste de dépense"
+            aria-label={t.charts.stackedAria}
           >
             <g transform={`translate(${MARGIN.left},${MARGIN.top})`}>
               {ticks.map((tick) => (
@@ -201,7 +206,7 @@ export function StackedCost({ data }: { data: DailyPoint[] }) {
       </div>
 
       <div className="mt-3">
-        <Legend items={SERIES.map((series) => ({ label: series.label, color: series.color }))} />
+        <Legend items={SERIES.map((series) => ({ label: t.common[series.key], color: series.color }))} />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import {
   barPath,
   useMeasure,
 } from "@/components/ui";
+import { useI18n } from "@/components/I18nProvider";
 
 export interface RankedItem {
   key: string;
@@ -52,7 +53,7 @@ function clamp(text: string, budget: number): string {
 export function RankedBars({
   items,
   formatValue,
-  emptyMessage = "Aucune donnée sur cette période.",
+  emptyMessage,
   labelWidth = DEFAULT_LABEL_WIDTH,
   onSelect,
 }: {
@@ -67,8 +68,9 @@ export function RankedBars({
   const { ref, width } = useMeasure<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const { t } = useI18n();
 
-  if (items.length === 0) return <EmptyState message={emptyMessage} />;
+  if (items.length === 0) return <EmptyState message={emptyMessage ?? t.common.noData} />;
 
   const height = items.length * ROW_HEIGHT;
   const max = Math.max(...items.map((item) => item.value), 0) || 1;
@@ -82,7 +84,7 @@ export function RankedBars({
   return (
     <div ref={ref} className="relative w-full min-w-0">
       {width > 0 && (
-        <svg width={width} height={height} role="img" aria-label="Classement par valeur">
+        <svg width={width} height={height} role="img" aria-label={t.charts.rankedAria}>
           {items.map((item, index) => {
             const y = index * ROW_HEIGHT;
             const barY = y + (ROW_HEIGHT - barThickness) / 2;
@@ -115,7 +117,7 @@ export function RankedBars({
                     y: box ? event.clientY - box.top : y + ROW_HEIGHT / 2,
                     title: item.label,
                     rows: item.detail ?? [
-                      { label: "Valeur", value: formatValue(item.value), color: item.color },
+                      { label: t.common.value, value: formatValue(item.value), color: item.color },
                     ],
                   });
                 }}
@@ -130,7 +132,7 @@ export function RankedBars({
                     y: y + ROW_HEIGHT / 2,
                     title: item.label,
                     rows: item.detail ?? [
-                      { label: "Valeur", value: formatValue(item.value), color: item.color },
+                      { label: t.common.value, value: formatValue(item.value), color: item.color },
                     ],
                   });
                 }}

@@ -24,6 +24,7 @@ Claude Code sessions actually cost, without sending anything anywhere.
 - [Why Tempo](#why-tempo)
 - [100% local — no data ever leaves your machine](#100-local--no-data-ever-leaves-your-machine)
 - [Getting started](#getting-started)
+- [Languages](#languages)
 - [Usage limit gauges and statusline](#usage-limit-gauges-and-statusline)
 - [What the cost number means](#what-the-cost-number-means)
 - [Refresh strategy](#refresh-strategy)
@@ -76,6 +77,22 @@ you've used Claude Code on this machine, Tempo will find its transcripts.
 
 To also get the session and weekly usage gauges, set up the statusline
 below.
+
+## Languages
+
+Tempo speaks **English, French, Spanish and German**.
+
+- **Dashboard**: the language follows your browser's preferences, and the
+  EN / FR / ES / DE picker in the header switches it on the spot (the choice
+  is remembered in a cookie). Numbers, dates and units follow the language's
+  conventions.
+- **Statusline and setup script**: they follow your terminal's language
+  (`LANG`), or `TEMPO_LANG` if set, e.g.
+  `"command": "TEMPO_LANG=fr node /absolute/path/to/tempo/scripts/statusline.mjs"`.
+
+Anything else falls back to English. Translations live in
+`src/lib/i18n/messages/`; adding a language means adding a file there, which
+TypeScript and the test suite check against the others key by key.
 
 ## Usage limit gauges and statusline
 
@@ -168,7 +185,7 @@ statusline command:
 ### What the statusline shows
 
 ```
-✻ Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52 %  ·  5h ▰▱▱▱▱▱▱▱ 6 % ↻ 18h40  ·  7j ▰▰▰▱▱▱▱▱ 35 % ↻ 3j14h10m
+✻ Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52%  ·  5h ▰▱▱▱▱▱▱▱ 6% ↻ at 20:00  ·  7d ▰▰▰▱▱▱▱▱ 35% ↻ in 3d14h10m
 ```
 
 | Block | Meaning |
@@ -176,8 +193,11 @@ statusline command:
 | `✻ Opus 5.5 ◔ medium` | Model and effort level (`○` low → `●` max); `⚡` when fast mode is on |
 | `tempo ⎇ main ●` | Folder and git branch; `●` for uncommitted changes, `↑`/`↓` for commits ahead/behind the remote |
 | `ctx` | Context window used — turns yellow at 60 %, red at 80 % |
-| `5h` | 5-hour session used, and the time it resets |
-| `7j` | Week used, and the time left until it resets |
+| `5h` | 5-hour session used, and the time it resets (`at 20:00`) |
+| `7d` | Week used, and the time left until it resets (`in 3d14h10m`) |
+
+The words keep a reset *time* from being mistaken for a *duration*. In
+French, the same line reads `↻ à 20h` and `7j … ↻ dans 3j14h10m`.
 
 Session and week gauges turn yellow at 70 % and red at 90 %.
 
@@ -216,7 +236,8 @@ npm test
 
 The suite covers transcript parsing (a reply split over several lines,
 messages rewritten by a resumed session, lines still being written),
-calibration and 5-hour windows, the limit projections and cap estimates, and
+calibration and 5-hour windows, the limit projections and cap estimates,
+language detection, per-language formatting and translation completeness, and
 the statusline and setup scripts end to end, run against temporary files.
 
 ### Verifying the pricing
@@ -332,6 +353,8 @@ of an unknown cap. For the actual percentage of your limits, see
 | `src/lib/aggregate.ts` | Calibration and aggregations (day, model, project, window) |
 | `src/lib/insights.ts` | Optimization levers: cache-write attribution, effort, models |
 | `src/lib/series.ts` | Stable per-model color assignment |
+| `src/lib/i18n/` | Languages, detection, and one message file per language |
+| `src/lib/format.ts` | Numbers, dates and units, per language |
 | `src/lib/limits.ts` | Usage limits: readings, pace projection, cap estimates |
 | `src/components/charts/` | Hand-written SVG charts |
 | `scripts/verify-pricing.ts` | Pricing verification against ground truth |
@@ -347,6 +370,7 @@ of an unknown cap. For the actual percentage of your limits, see
 | `CLAUDE_CONFIG_PATH` | `~/.claude.json` | Where account info is read from |
 | `TEMPO_LIMITS_PATH` | `~/.claude/tempo/rate-limits.json` | Where usage limits are saved and read, history alongside (set it for both the statusline and the server) |
 | `TEMPO_ALERT_THRESHOLDS` | `80,95` | Statusline alert thresholds, in %, or `off` |
+| `TEMPO_LANG` | terminal language | Language of the statusline, alerts and setup script: `en`, `fr`, `es`, `de` |
 | `CLAUDE_SETTINGS_PATH` | `~/.claude/settings.json` | Settings file edited by `setup:statusline` |
 
 ## Design notes

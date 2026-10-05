@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
 
+import { getMessages } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
+
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Tempo — usage Claude",
-  description:
-    "Suivi local de ton usage de Claude Code : coût équivalent API, tokens, cache, fenêtres de quota.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { meta } = getMessages(await getRequestLocale());
+  return { title: meta.title, description: meta.description };
+}
 
 export const viewport: Viewport = {
   // La page s'adapte aux deux thèmes ; la barre du navigateur suit la surface.
@@ -29,11 +31,12 @@ const THEME_INIT_SCRIPT = `
   } catch (e) {}
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getRequestLocale();
   return (
     // Le script de thème modifie `data-theme` avant l'hydratation : l'écart avec
     // le rendu serveur est voulu, on le signale à React.
-    <html lang="fr" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

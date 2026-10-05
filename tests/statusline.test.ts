@@ -18,12 +18,13 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function run(script: string, input: string, args: string[] = []) {
+function run(script: string, input: string, args: string[] = [], lang = "fr") {
   const result = spawnSync("node", [script, ...args], {
     input,
     encoding: "utf8",
     env: {
       ...process.env,
+      TEMPO_LANG: lang,
       TEMPO_LIMITS_PATH: path.join(dir, "rate-limits.json"),
       CLAUDE_SETTINGS_PATH: path.join(dir, "settings.json"),
       TEMPO_ALERT_DRY_RUN: "1",
@@ -65,8 +66,16 @@ describe("statusline", () => {
     expect(status).toBe(0);
     expect(stdout).toContain("✻ Opus 5.5 ◑ high");
     expect(stdout).toMatch(/ctx ▰{4}▱{4} 52 %/);
-    expect(stdout).toMatch(/5h ▰▱{7} 6 % ↻ \d+h/);
-    expect(stdout).toMatch(/7j ▰{3}▱{5} 35 % ↻ 3j\d+h\d+m/);
+    // Une heure pour la session, une durée pour la semaine : la préposition
+    // évite de confondre les deux.
+    expect(stdout).toMatch(/5h ▰▱{7} 6 % ↻ à \d+h(\d{2})?/);
+    expect(stdout).toMatch(/7j ▰{3}▱{5} 35 % ↻ dans 3j\d+h\d+m/);
+  });
+
+  it("follows the requested language", () => {
+    const { stdout } = run(STATUSLINE, limitsInput(6, 35), [], "en");
+    expect(stdout).toMatch(/5h ▰▱{7} 6% ↻ at \d+:\d{2}/);
+    expect(stdout).toMatch(/7d ▰{3}▱{5} 35% ↻ in 3d\d+h\d+m/);
   });
 
   it("never fails on unreadable input", () => {
