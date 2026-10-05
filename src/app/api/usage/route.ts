@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readAccount } from "@/lib/account";
 import { buildReport, isRangeKey, type RangeKey } from "@/lib/aggregate";
+import { attachBranchLinks } from "@/lib/git";
 import { loadLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
 
@@ -18,8 +19,10 @@ export async function GET(request: Request) {
   try {
     const [scan, account] = await Promise.all([scanUsage(), readAccount()]);
     const limits = await loadLimits(scan);
+    const report = buildReport(scan, range, undefined, { projectId, model });
+    report.byBranch = await attachBranchLinks(report.byBranch);
     return NextResponse.json(
-      { account, limits, report: buildReport(scan, range, undefined, { projectId, model }) },
+      { account, limits, report },
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

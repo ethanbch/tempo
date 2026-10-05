@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { RangeKey, UsageReport } from "@/lib/aggregate";
 import { LOCALES, LOCALE_NAMES, isLocale } from "@/lib/i18n";
@@ -256,7 +256,7 @@ export function Dashboard({
     ],
   }));
 
-  function selectTab(next: TabKey) {
+  const selectTab = useCallback((next: TabKey) => {
     setTab(next);
     // L'onglet vit dans l'URL : un rechargement ou un lien partagé y ramène.
     const url = new URL(window.location.href);
@@ -264,10 +264,54 @@ export function Dashboard({
     else url.searchParams.set("tab", next);
     window.history.replaceState(null, "", url);
     window.scrollTo({ top: 0 });
-  }
+  }, []);
+
+  // Raccourcis clavier : 1 à 4 pour les onglets, t pour le thème, / pour le filtre
+  // projet. Ignorés pendant la saisie et avec une touche de modification.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea, [contenteditable='true']")) return;
+      if (document.querySelector("[role='dialog']")) return;
+      const index = ["1", "2", "3", "4"].indexOf(event.key);
+      if (index !== -1) {
+        selectTab(TABS[index]);
+      } else if (event.key === "t") {
+        document.getElementById("theme-toggle")?.click();
+      } else if (event.key === "/") {
+        event.preventDefault();
+        document.getElementById("filter-project")?.focus();
+      } else {
+        return;
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectTab]);
 
   const selectClass =
     "h-9 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)]";
+
+  const branches = report.byBranch.slice(0, 8).map((branch) => ({
+    key: branch.key,
+    label: branch.branch,
+    value: branch.cost,
+    // Série nominale : une seule teinte, la longueur porte déjà la grandeur.
+    color: SERIES_VARS[0],
+    caption: t.captions.branch(branch.projectName, branch.sessions, branch.link?.pr ?? null),
+    detail: [
+      { label: t.common.cost, value: usd(branch.cost) },
+      { label: t.common.requests, value: integer(branch.requests) },
+      { label: t.common.sessions, value: integer(branch.sessions) },
+      { label: t.common.lastActivity, value: timeAgo(branch.lastActivity, now) },
+    ],
+  }));
+
+  function openBranch(key: string) {
+    const url = report.byBranch.find((branch) => branch.key === key)?.link?.url;
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1140px] px-4 py-6 sm:px-8 sm:py-8">
@@ -326,6 +370,7 @@ export function Dashboard({
           </div>
 
           <select
+            id="filter-project"
             aria-label={t.filters.byProject}
             value={projectId}
             onChange={(event) => void reload(range, event.target.value, model)}
@@ -400,6 +445,15 @@ export function Dashboard({
                 formatValue={(value) => usd(value)}
                 labelWidth={210}
                 onSelect={setSelectedSessionId}
+              />
+            </Card>
+            <Card title={t.cards.branches.title} info={t.cards.branches.subtitle}>
+              <RankedBars
+                items={branches}
+                formatValue={(value) => usd(value)}
+                labelWidth={230}
+                emptyMessage={t.cards.branches.empty}
+                onSelect={openBranch}
               />
             </Card>
             <Card title={t.cards.effort.title} info={t.cards.effort.subtitle}>
@@ -514,6 +568,7 @@ function ThemeToggle() {
   return (
     <button
       type="button"
+      id="theme-toggle"
       onClick={toggle}
       aria-label={t.theme.change(label)}
       title={label}
@@ -615,11 +670,12 @@ function Footer({ report, onOpenMethod }: { report: UsageReport; onOpenMethod: (
   const { t, f } = useI18n();
   const { meta } = report;
   return (
-    <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4 text-[12px] text-[var(--ink-muted)]">
-      <p className="mono min-w-0 truncate">
+    <footer className="mt-8 flex items-center justify-between gap-6 border-t border-[var(--border)] pt-4 text-[12px] text-[var(--ink-muted)]">
+      <p className="mono min-w-0 flex-1 truncate">
         {t.footer.files(f.integer(meta.fileCount), f.bytes(meta.byteCount))} {meta.root}
         {t.footer.scanned(f.formatDateTime(meta.scannedAt))}
       </p>
+      <p className="mono hidden shrink-0 lg:block">{t.shortcuts.hint}</p>
       <button
         type="button"
         onClick={onOpenMethod}

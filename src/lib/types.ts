@@ -26,6 +26,8 @@ export interface UsageEvent extends TokenCounts {
   /** Clé du projet, dérivée du répertoire de travail. */
   projectId: string;
   projectName: string;
+  /** Répertoire de travail de la session, quand le transcript le donne. */
+  projectPath: string | null;
   gitBranch: string | null;
   /** Vrai quand la requête vient d'un sous-agent plutôt que de la boucle principale. */
   isSidechain: boolean;

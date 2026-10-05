@@ -149,6 +149,22 @@ export interface SessionPoint extends TokenTotals {
   durationMs: number;
 }
 
+/** Coût d'une branche git dans un projet : ce qu'a coûté une fonctionnalité. */
+export interface BranchPoint {
+  key: string;
+  projectId: string;
+  projectName: string;
+  /** Répertoire du projet, pour retrouver la PR dans son historique git local. */
+  projectPath: string | null;
+  branch: string;
+  cost: number;
+  requests: number;
+  sessions: number;
+  lastActivity: string;
+  /** Lien vers la branche ou sa PR, ajouté côté serveur depuis le dépôt local. */
+  link?: { url: string; pr: number | null };
+}
+
 /** Une fenêtre de quota de 5 heures, ouverte par une requête après une pause. */
 export interface QuotaBlock extends TokenTotals {
   start: string;
@@ -235,6 +251,7 @@ export interface UsageReport {
   byModel: ModelPoint[];
   byProject: ProjectPoint[];
   bySession: SessionPoint[];
+  byBranch: BranchPoint[];
   blocks: QuotaBlock[];
   heatmap: HeatCell[];
   /** Leviers d'optimisation dérivés des mêmes requêtes. */
@@ -360,6 +377,8 @@ export function buildReport(
   const projects = new Map<string, ProjectPoint>();
   const projectSessions = new Map<string, Set<string>>();
   const sessionPoints = new Map<string, SessionPoint>();
+  const branchPoints = new Map<string, BranchPoint>();
+  const branchSessions = new Map<string, Set<string>>();
   const sessionModelRequests = new Map<string, Map<string, number>>();
   const heat = new Map<string, HeatCell>();
   const sessions = new Set<string>();
@@ -455,6 +474,33 @@ export function buildReport(
     const modelCounts = sessionModelRequests.get(event.sessionId)!;
     modelCounts.set(modelId, (modelCounts.get(modelId) ?? 0) + 1);
 
+    // La branche principale n'est pas une fonctionnalité : on la laisse de côté.
+    if (event.gitBranch && !["main", "master", "HEAD"].includes(event.gitBranch)) {
+      const branchKey = `${event.projectId}::${event.gitBranch}`;
+      let branch = branchPoints.get(branchKey);
+      if (!branch) {
+        branch = {
+          key: branchKey,
+          projectId: event.projectId,
+          projectName: event.projectName,
+          projectPath: event.projectPath,
+          branch: event.gitBranch,
+          cost: 0,
+          requests: 0,
+          sessions: 0,
+          lastActivity: event.timestamp,
+        };
+        branchPoints.set(branchKey, branch);
+        branchSessions.set(branchKey, new Set());
+      }
+      branch.cost += cost;
+      branch.requests += 1;
+      branch.lastActivity = event.timestamp;
+      branch.projectPath ??= event.projectPath;
+      branchSessions.get(branchKey)!.add(event.sessionId);
+      branch.sessions = branchSessions.get(branchKey)!.size;
+    }
+
     const date = new Date(event.time);
     // `getDay()` place dimanche en 0 ; on décale pour une semaine lundi-dimanche.
     const weekday = (date.getDay() + 6) % 7;
@@ -545,6 +591,7 @@ export function buildReport(
     byModel: [...models.values()].sort((a, b) => b.cost - a.cost),
     byProject: [...projects.values()].sort((a, b) => b.cost - a.cost),
     bySession: [...sessionPoints.values()].sort((a, b) => b.cost - a.cost),
+    byBranch: [...branchPoints.values()].sort((a, b) => b.cost - a.cost),
     blocks: buildQuotaBlocks(events, now, factorFor),
     heatmap: [...heat.values()],
     insights: buildInsights(events, factorFor),

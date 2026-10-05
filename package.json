@@ -1,16 +1,45 @@
 {
-  "name": "tempo",
-  "version": "0.4.0",
-  "private": true,
+  "name": "tempo-dashboard",
+  "version": "0.5.0",
   "license": "MIT",
+  "description": "Local dashboard for your Claude Code usage: cost, tokens, cache, limits.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "usage",
+    "dashboard",
+    "statusline",
+    "cli"
+  ],
+  "homepage": "https://github.com/ethanbch/tempo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethanbch/tempo.git"
+  },
+  "bin": {
+    "tempo": "bin/tempo.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "scripts/statusline.mjs",
+    ".next/standalone/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/postbuild.mjs && node scripts/build-cli.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "verify:pricing": "node --experimental-strip-types scripts/verify-pricing.ts",
-    "setup:statusline": "node scripts/setup-statusline.mjs"
+    "setup:statusline": "node scripts/build-cli.mjs && node bin/tempo.mjs setup",
+    "build:cli": "node scripts/build-cli.mjs",
+    "pretest": "node scripts/build-cli.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
@@ -22,6 +51,7 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",

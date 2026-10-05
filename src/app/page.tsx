@@ -2,6 +2,7 @@ import { readAccount } from "@/lib/account";
 import { buildReport } from "@/lib/aggregate";
 import { getMessages } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { attachBranchLinks } from "@/lib/git";
 import { loadLimits } from "@/lib/limits";
 import { scanUsage } from "@/lib/scan";
 import { isTabKey } from "@/lib/tabs";
@@ -25,6 +26,7 @@ export default async function Page({
   const tab = isTabKey(params.tab) ? params.tab : "overview";
   const limits = await loadLimits(scan);
   const report = buildReport(scan, "7d");
+  report.byBranch = await attachBranchLinks(report.byBranch);
 
   if (scan.fileCount === 0) {
     return <NoTranscripts root={scan.root} text={getMessages(locale).noTranscripts} />;

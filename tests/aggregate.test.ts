@@ -70,6 +70,21 @@ describe("buildReport", () => {
     expect(buildReport(scan, "all", NOW).summary.previousCost).toBeNull();
   });
 
+  it("sums cost per working branch, leaving main aside", () => {
+    const scan = makeScan([
+      makeEvent({ time: NOW - 3 * HOUR, costTotal: 2, gitBranch: "feat/a", sessionId: "s1" }),
+      makeEvent({ time: NOW - 2 * HOUR, costTotal: 3, gitBranch: "feat/a", sessionId: "s2" }),
+      makeEvent({ time: NOW - HOUR, costTotal: 9, gitBranch: "main" }),
+      makeEvent({ time: NOW - HOUR, costTotal: 1, gitBranch: "feat/b" }),
+    ]);
+
+    const { byBranch } = buildReport(scan, "all", NOW);
+    expect(byBranch.map((branch) => [branch.branch, branch.cost, branch.sessions])).toEqual([
+      ["feat/a", 5, 2],
+      ["feat/b", 1, 1],
+    ]);
+  });
+
   it("filters by period and by project", () => {
     const scan = makeScan([
       makeEvent({ time: NOW - 48 * HOUR, costTotal: 10 }),

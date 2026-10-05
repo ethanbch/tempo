@@ -117,6 +117,12 @@ export const de: Messages = {
       empty: "Keine Effort-Stufe in diesem Zeitraum erfasst.",
     },
     table: { title: "Tagesübersicht", subtitle: "Alle Werte der Diagramme im Klartext." },
+    branches: {
+      title: "Nach Branch",
+      subtitle:
+        "Kosten der Arbeits-Branches, ohne main und master. Der Link öffnet den PR, wenn die lokale Git-Historie ihn findet (Merge-Commit), sonst den Branch. Kein Netzwerkaufruf.",
+      empty: "Kein Arbeits-Branch in diesem Zeitraum.",
+    },
   },
 
   captions: {
@@ -127,6 +133,8 @@ export const de: Messages = {
       `${sessions} ${count === 1 ? "Sitzung" : "Sitzungen"} · ${requests} Anfr.`,
     requestsDuration: (requests, duration) => `${requests} Anfr. · ${duration}`,
     contextRewritten: "Neu geschriebener Kontext",
+    branch: (project, sessions, pr) =>
+      `${project}${pr ? ` · PR #${pr}` : ""} · ${sessions} ${sessions > 1 ? "Sitzungen" : "Sitzung"}`,
   },
 
   causes: {
@@ -160,6 +168,10 @@ export const de: Messages = {
     noPrevious: "keine Aktivität in der Vorperiode",
     avgPerDay: "Schnitt pro aktivem Tag",
     peakDay: "Teuerster Tag",
+  },
+
+  shortcuts: {
+    hint: "Tastenkürzel: 1–4 Tabs · t Design · / Projekt",
   },
 
   method: {
@@ -268,6 +280,11 @@ export const de: Messages = {
     output: (tokens) => `${tokens} Ausgabe`,
     reread: (tokens) => `${tokens} erneut gelesen`,
     cacheRewritten: (cause) => `Cache neu geschrieben: ${cause}`,
+    branch: "Branch",
+    peakContext: "Max. Kontext",
+    rewrites: "Cache neu geschrieben",
+    contextTitle: "Erneut gelesener Kontext pro Anfrage",
+    contextLegend: "Gelbe Linie: Cache nach einer Pause, einem Modell- oder Effort-Wechsel neu geschrieben.",
   },
 
   table: {
@@ -301,6 +318,70 @@ export const de: Messages = {
     activeDays: (days) => ` · ${days} aktive Tage`,
     privacy: (window) =>
       `Keine Daten verlassen deinen Rechner: Die App liest lokale Dateien und ruft keinen entfernten Dienst auf. Die Limit-Anzeigen stammen aus den Messungen, die die Claude-Code-Statuszeile speichert. Länge eines Kontingentfensters: ${window}.`,
+  },
+
+  cli: {
+    help: [
+      "Verwendung: tempo [Befehl]",
+      "",
+      "  tempo            Startet das Dashboard und öffnet es im Browser",
+      "  tempo status     Übersicht im Terminal: Limits, Kosten, Branch",
+      "  tempo doctor     Prüft die Installation",
+      "  tempo setup      Installiert Statuszeile und Sitzungsübersicht",
+      "  tempo setup --remove   Deinstalliert beides",
+      "",
+      "Optionen für tempo: --port <n>, --no-open",
+    ],
+    noBuild: "Das Dashboard ist nicht gebaut. Führe npm run build im Tempo-Ordner aus.",
+    starting: "Tempo startet…",
+    ready: (url) => `Tempo läuft auf ${url}`,
+    stop: "Strg+C zum Beenden.",
+    startFailed: "Der Server ist nicht gestartet. Versuche einen anderen Port mit --port.",
+    setupHint: "Statuszeile nicht installiert: tempo setup zeigt deine Limits.",
+    unknown: (command) => `Unbekannter Befehl: ${command}`,
+    invalidJson: (file) => `${file} ist kein gültiges JSON: Korrigiere es und starte erneut.`,
+    yesNo: "(j/N)",
+    yes: "^(j|ja|y|yes)$",
+    existing: (current) => `Es ist bereits eine Statuszeile eingerichtet:\n  ${current}`,
+    replace: "Durch die von Tempo ersetzen?",
+    untouched: "Nichts wurde geändert. Mit --force erneut starten, um sie zu ersetzen.",
+    setAside: (file) => `Gesichert in ${file}, wird mit --remove wiederhergestellt.`,
+    installed: (file) => `Statuszeile und Sitzungsübersicht installiert in ${file}.`,
+    nextMessage: "Sie erscheinen bei deiner nächsten Nachricht in Claude Code.",
+    notInstalled: "Nichts von Tempo ist installiert: nichts zu tun.",
+    removedRestored: "Deinstalliert. Die vorherige Statuszeile ist wiederhergestellt.",
+    removed: "Deinstalliert.",
+    session: "Sitzung (5 Std.)",
+    week: "Woche",
+    today: "Heute",
+    last7: "7 Tage",
+    branch: "Branch",
+    lever: "Hebel",
+    noLimits: "Keine Limit-Messung: tempo setup ausführen, dann eine Nachricht in Claude Code senden.",
+    limitAt: (time) => `Limit ~${time}`,
+    requests: (count) => `${count} Anfr.`,
+    avoidable: (amount) => `${amount} vermeidbar`,
+    ok: "ok",
+    warn: "Warnung",
+    missing: "fehlt",
+    doctorTitle: "tempo doctor",
+    node: (version) => `Node ${version}`,
+    nodeOld: (version) => `Node ${version}: Tempo braucht Node 20 oder neuer`,
+    transcripts: (count, root) => `${count} Transkripte in ${root}`,
+    noTranscripts: (root) => `Keine Transkripte in ${root}: starte eine Claude-Code-Sitzung`,
+    account: (plan) => `Claude-${plan}-Konto`,
+    noAccount: "Kein Claude-Konto in ~/.claude.json gefunden",
+    statusline: "Statuszeile installiert",
+    noStatusline: "Statuszeile nicht installiert: tempo setup",
+    hook: "Sitzungsübersicht installiert",
+    noHook: "Sitzungsübersicht nicht installiert: tempo setup",
+    reading: (ago) => `Letzte Limit-Messung ${ago}`,
+    readingOld: (ago) => `Letzte Limit-Messung ${ago}: sende eine Nachricht in Claude Code zum Aktualisieren`,
+    noReading: "Keine Limit-Messung: sende eine Nachricht in Claude Code",
+    build: "Dashboard gebaut",
+    noBuild2: "Dashboard nicht gebaut: npm run build",
+    allGood: "Alles ist eingerichtet.",
+    toFix: (count) => `${count} Punkt${count > 1 ? "e" : ""} zu beheben.`,
   },
 
   noTranscripts: {

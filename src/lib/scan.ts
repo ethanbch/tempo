@@ -261,6 +261,7 @@ function ingestLine(line: string, state: FileState, file: TranscriptFile): void 
     sessionId: str(record.sessionId) ?? "",
     projectId: file.projectDir,
     projectName: state.projectName,
+    projectPath: state.cwd,
     gitBranch: str(record.gitBranch),
     isSidechain: record.isSidechain === true,
     cost: computeCost(model, tokens, speed),
@@ -304,10 +305,14 @@ async function updateFileState(
     // Le `cwd` peut n'apparaître qu'après les premières lignes : on rétropropage
     // le nom sur les événements déjà collectés, une seule fois.
     state.projectName = projectName;
-    for (const event of state.events) event.projectName = projectName;
+    for (const event of state.events) {
+      event.projectName = projectName;
+      event.projectPath = state.cwd;
+    }
   } else {
     for (let index = before; index < state.events.length; index += 1) {
       state.events[index].projectName = projectName;
+      state.events[index].projectPath = state.cwd;
     }
   }
 

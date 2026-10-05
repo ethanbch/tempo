@@ -14,6 +14,34 @@ const nextConfig: NextConfig = {
    * compilation et d'exécution restent affichées.
    */
   devIndicators: false,
+
+  /*
+   * Serveur autonome : `npx tempo` le lance sans installer les dépendances de
+   * développement ni passer par `next start`.
+   */
+  output: "standalone",
+  images: { unoptimized: true },
+  // Les chemins lus dépendent du dossier personnel : sans cette liste, le traçage
+  // embarquerait tout le dépôt (docs, marque, tests) dans le serveur autonome.
+  outputFileTracingExcludes: {
+    "*": [
+      "brand/**",
+      "docs/**",
+      "tests/**",
+      "scripts/**",
+      "bin/**",
+      "dist/**",
+      "*.md",
+      "package-lock.json",
+      "tsconfig.tsbuildinfo",
+      "src/**",
+      "*.config.mjs",
+      "*.config.mts",
+      // Optimisation d'images (inutilisée ici) : binaires propres à la machine de build.
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+    ],
+  },
 };
 
 export default nextConfig;

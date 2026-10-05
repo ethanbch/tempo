@@ -117,6 +117,12 @@ export const en: Messages = {
       empty: "No effort level recorded in this period.",
     },
     table: { title: "Daily breakdown", subtitle: "Every value from the charts, in plain text." },
+    branches: {
+      title: "By branch",
+      subtitle:
+        "Cost of working branches, excluding main and master. The link opens the PR when the local git history finds it (merged with a merge commit), otherwise the branch. No network call.",
+      empty: "No working branch in this period.",
+    },
   },
 
   captions: {
@@ -127,6 +133,8 @@ export const en: Messages = {
       `${sessions} ${count === 1 ? "session" : "sessions"} · ${requests} req`,
     requestsDuration: (requests, duration) => `${requests} req · ${duration}`,
     contextRewritten: "Context rewritten",
+    branch: (project, sessions, pr) =>
+      `${project}${pr ? ` · PR #${pr}` : ""} · ${sessions} session${sessions > 1 ? "s" : ""}`,
   },
 
   causes: {
@@ -160,6 +168,10 @@ export const en: Messages = {
     noPrevious: "no activity in the previous period",
     avgPerDay: "Average per active day",
     peakDay: "Most expensive day",
+  },
+
+  shortcuts: {
+    hint: "Shortcuts: 1–4 tabs · t theme · / project",
   },
 
   method: {
@@ -268,6 +280,11 @@ export const en: Messages = {
     output: (tokens) => `${tokens} output`,
     reread: (tokens) => `${tokens} re-read`,
     cacheRewritten: (cause) => `cache rewritten: ${cause}`,
+    branch: "Branch",
+    peakContext: "Peak context",
+    rewrites: "Cache rewrites",
+    contextTitle: "Context re-read per request",
+    contextLegend: "Yellow line: cache rewritten after a pause, a model switch or an effort switch.",
   },
 
   table: {
@@ -301,6 +318,70 @@ export const en: Messages = {
     activeDays: (days) => ` · ${days} active days`,
     privacy: (window) =>
       `No data leaves your machine: the app reads local files and calls no remote service. The limit gauges come from the readings saved by the Claude Code statusline. Length of a quota window: ${window}.`,
+  },
+
+  cli: {
+    help: [
+      "Usage: tempo [command]",
+      "",
+      "  tempo            Start the dashboard and open it in the browser",
+      "  tempo status     Summary in the terminal: limits, cost, branch",
+      "  tempo doctor     Check the installation",
+      "  tempo setup      Install the statusline and the session summary",
+      "  tempo setup --remove   Uninstall them",
+      "",
+      "Options for tempo: --port <n>, --no-open",
+    ],
+    noBuild: "The dashboard isn't built. Run npm run build in the Tempo folder.",
+    starting: "Starting Tempo…",
+    ready: (url) => `Tempo is running at ${url}`,
+    stop: "Ctrl+C to stop.",
+    startFailed: "The server didn't start. Try another port with --port.",
+    setupHint: "Statusline not installed: run tempo setup to see your limits.",
+    unknown: (command) => `Unknown command: ${command}`,
+    invalidJson: (file) => `${file} isn't valid JSON: fix it, then run this again.`,
+    yesNo: "(y/N)",
+    yes: "^(y|yes)$",
+    existing: (current) => `A statusline is already configured:\n  ${current}`,
+    replace: "Replace it with Tempo's?",
+    untouched: "Nothing was changed. Run again with --force to replace it.",
+    setAside: (file) => `Set aside in ${file}, restored by --remove.`,
+    installed: (file) => `Statusline and session summary installed in ${file}.`,
+    nextMessage: "They show up with your next message in Claude Code.",
+    notInstalled: "Nothing from Tempo is installed: nothing to do.",
+    removedRestored: "Uninstalled. The previous statusline is restored.",
+    removed: "Uninstalled.",
+    session: "Session (5 h)",
+    week: "Week",
+    today: "Today",
+    last7: "7 days",
+    branch: "Branch",
+    lever: "Lever",
+    noLimits: "No limits reading: run tempo setup, then send a message in Claude Code.",
+    limitAt: (time) => `limit ~${time}`,
+    requests: (count) => `${count} req`,
+    avoidable: (amount) => `${amount} avoidable`,
+    ok: "ok",
+    warn: "warning",
+    missing: "missing",
+    doctorTitle: "tempo doctor",
+    node: (version) => `Node ${version}`,
+    nodeOld: (version) => `Node ${version}: Tempo needs Node 20 or newer`,
+    transcripts: (count, root) => `${count} transcripts in ${root}`,
+    noTranscripts: (root) => `No transcripts in ${root}: run a Claude Code session`,
+    account: (plan) => `Claude ${plan} account`,
+    noAccount: "No Claude account found in ~/.claude.json",
+    statusline: "Statusline installed",
+    noStatusline: "Statusline not installed: tempo setup",
+    hook: "Session summary installed",
+    noHook: "Session summary not installed: tempo setup",
+    reading: (ago) => `Last limits reading ${ago}`,
+    readingOld: (ago) => `Last limits reading ${ago}: send a message in Claude Code to refresh it`,
+    noReading: "No limits reading: send a message in Claude Code",
+    build: "Dashboard built",
+    noBuild2: "Dashboard not built: npm run build",
+    allGood: "Everything is in place.",
+    toFix: (count) => `${count} item${count > 1 ? "s" : ""} to fix.`,
   },
 
   noTranscripts: {

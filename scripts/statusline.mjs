@@ -20,7 +20,7 @@
  *   TEMPO_LANG               langue (en, fr, es, de), sinon celle du terminal, sinon l'anglais
  */
 import { execFile, spawn } from "node:child_process";
-import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -60,6 +60,7 @@ const TEXTS = {
     resetsAt: (time) => `Resets at ${time}`,
     resetsIn: (remaining) => `Resets in ${remaining}`,
     unknownReset: "Reset time unknown",
+    limitAt: (time) => `limit ~${time}`,
   },
   fr: {
     week: "7j",
@@ -75,6 +76,7 @@ const TEXTS = {
     resetsAt: (time) => `Réinitialisation à ${time}`,
     resetsIn: (remaining) => `Réinitialisation dans ${remaining}`,
     unknownReset: "Échéance inconnue",
+    limitAt: (time) => `limite ~${time}`,
   },
   es: {
     week: "7d",
@@ -90,6 +92,7 @@ const TEXTS = {
     resetsAt: (time) => `Se reinicia a las ${time}`,
     resetsIn: (remaining) => `Se reinicia en ${remaining}`,
     unknownReset: "Reinicio desconocido",
+    limitAt: (time) => `límite ~${time}`,
   },
   de: {
     week: "7T",
@@ -105,6 +108,7 @@ const TEXTS = {
     resetsAt: (time) => `Zurücksetzung um ${time}`,
     resetsIn: (remaining) => `Zurücksetzung in ${remaining}`,
     unknownReset: "Zurücksetzung unbekannt",
+    limitAt: (time) => `Limit ~${time}`,
   },
 };
 
@@ -339,6 +343,62 @@ async function record(limits) {
   }
 }
 
+const SESSION_MS = 5 * 60 * 60 * 1000;
+/** Période sur laquelle se mesure le rythme récent de la session, comme le tableau de bord. */
+const PACE_LOOKBACK_MS = 60 * 60 * 1000;
+const MIN_PACE_SPAN_MS = 5 * 60 * 1000;
+/** Fin de l'historique relue à chaque passage : largement de quoi couvrir une session. */
+const HISTORY_TAIL_BYTES = 64 * 1024;
+
+async function historyTail() {
+  try {
+    const file = await open(HISTORY_PATH, "r");
+    try {
+      const { size } = await file.stat();
+      const length = Math.min(size, HISTORY_TAIL_BYTES);
+      const buffer = Buffer.alloc(length);
+      await file.read(buffer, 0, length, size - length);
+      return buffer.toString("utf8").split("\n").slice(size > length ? 1 : 0);
+    } finally {
+      await file.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Heure à laquelle la session atteindra sa limite au rythme de la dernière
+ * heure, si c'est avant la réinitialisation ; sinon null.
+ */
+async function sessionLimitAt(current) {
+  const resetAt = resetMs(current?.resets_at);
+  const used = current?.used_percentage;
+  if (resetAt === null || typeof used !== "number" || used >= 100) return null;
+  const now = Date.now();
+  const windowStart = resetAt - SESSION_MS;
+  const from = Math.max(windowStart, now - PACE_LOOKBACK_MS);
+
+  let anchor = { at: windowStart, used: 0 };
+  for (const line of await historyTail()) {
+    try {
+      const sample = JSON.parse(line);
+      const at = Date.parse(sample.capturedAt);
+      const window = sample.rate_limits?.five_hour;
+      if (!window || at > from || at < windowStart || !sameWindow(window, current)) continue;
+      if (at >= anchor.at) anchor = { at, used: window.used_percentage };
+    } catch {
+      // Ligne tronquée : ignorée.
+    }
+  }
+
+  const span = now - anchor.at;
+  const rate = (used - anchor.used) / span;
+  if (span < MIN_PACE_SPAN_MS || !(rate > 0)) return null;
+  const hitsAt = now + (100 - used) / rate;
+  return hitsAt < resetAt ? new Date(hitsAt) : null;
+}
+
 /** « 5h ▰▰▱▱▱▱▱▱ 23 % ↻ 16h40 », teinté selon la consommation. */
 function gauge(name, used, { warnAt, criticalAt, reset }) {
   if (typeof used !== "number" || !Number.isFinite(used)) return null;
@@ -391,6 +451,9 @@ const where = dir
       .join(" ")
   : null;
 
+// Le rythme compare le relevé actuel au dernier relevé d'il y a une heure ou plus.
+const limitAt = await sessionLimitAt(limits?.five_hour);
+
 const parts = [
   model,
   where,
@@ -401,7 +464,8 @@ const parts = [
     criticalAt: 90,
     reset: (() => {
       const time = resetClock(limits?.five_hour?.resets_at);
-      return time && T.at(time);
+      if (!time) return null;
+      return limitAt ? `${T.at(time)} ${warning("· " + T.limitAt(clock(limitAt)))}` : T.at(time);
     })(),
   }),
   gauge(T.week, limits?.seven_day?.used_percentage, {

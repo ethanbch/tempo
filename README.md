@@ -23,10 +23,16 @@ Claude Code sessions actually cost, without sending anything anywhere.
 ![Tempo's overview: session and weekly limits with their pace, API-equivalent cost against the previous period, cost per day, and the optimization teaser](docs/screenshot.png)
 
 The overview fits on one screen; three more tabs hold the detail:
-**Spend** (by model, project, session and effort level), **Activity** (limit
+**Spend** (by model, project, session, git branch and effort level), **Activity** (limit
 history and projections, 5-hour windows, when you use Claude) and
 **Optimize** (levers and cache rebuilds). Explanations sit behind the ⓘ
 next to each title, and the calculation method behind "How it's computed".
+Keys `1` to `4` switch tabs, `t` the theme, `/` focuses the project filter.
+
+Per-branch cost links each working branch to its pull request when the local
+git history has its merge commit (`Merge pull request #12 from …`), otherwise
+to the branch itself. Tempo reads the local repository only; it calls neither
+GitHub nor any other service.
 
 ## Table of contents
 
@@ -34,6 +40,7 @@ next to each title, and the calculation method behind "How it's computed".
 - [100% local — no data ever leaves your machine](#100-local--no-data-ever-leaves-your-machine)
 - [Getting started](#getting-started)
 - [Languages](#languages)
+- [Command line](#command-line)
 - [Usage limit gauges and statusline](#usage-limit-gauges-and-statusline)
 - [What the cost number means](#what-the-cost-number-means)
 - [Refresh strategy](#refresh-strategy)
@@ -76,17 +83,45 @@ claude.ai, which leave no local trace.
 ## Getting started
 
 ```bash
+npx tempo-dashboard
+```
+
+This starts the dashboard on `127.0.0.1` and opens it in your browser. Tempo
+finds the transcripts of every Claude Code session run on this machine.
+
+To see your session and weekly limits, install the statusline and the session
+summary once:
+
+```bash
+npx tempo-dashboard setup
+```
+
+To keep the `tempo` command around, install it globally:
+`npm install -g tempo-dashboard`, then `tempo`.
+
+## Command line
+
+| Command | What it does |
+| --- | --- |
+| `tempo` | Start the dashboard and open it (`--port <n>`, `--no-open`) |
+| `tempo status` | Limits with their pace, cost over 24 hours and 7 days, the current branch's cost, the lever to look at |
+| `tempo doctor` | Check the installation and say what to fix |
+| `tempo setup` | Install the statusline and the session summary (`--force` to replace another statusline, `--remove` to uninstall) |
+
+The session summary is a Claude Code `SessionEnd` hook. When you quit a
+session, it prints one line: duration, API-equivalent cost, requests, branch
+and session limit. It prints nothing on `/clear`. Set
+`TEMPO_SESSION_SUMMARY=off` to turn it off.
+
+### From a clone
+
+```bash
 git clone https://github.com/ethanbch/tempo.git
 cd tempo
 npm install
-npm run dev
+npm run dev      # dashboard with hot reload, on http://localhost:3000
+npm run build    # production server and the tempo command (node bin/tempo.mjs)
 ```
-
-Open [http://localhost:3000](http://localhost:3000). That's it — as long as
-you've used Claude Code on this machine, Tempo will find its transcripts.
-
-To also get the session and weekly usage gauges, set up the statusline
-below.
 
 ## Languages
 
@@ -98,7 +133,7 @@ Tempo speaks **English, French, Spanish and German**.
   conventions.
 - **Statusline and setup script**: they follow your terminal's language
   (`LANG`), or `TEMPO_LANG` if set, e.g.
-  `"command": "TEMPO_LANG=fr node /absolute/path/to/tempo/scripts/statusline.mjs"`.
+  `"command": "TEMPO_LANG=fr node ~/.claude/tempo/bin/statusline.mjs"`.
 
 Anything else falls back to English. Translations live in
 `src/lib/i18n/messages/`; adding a language means adding a file there, which
@@ -119,41 +154,20 @@ your credentials and still makes no network call.
 
 ### Setup
 
-From the Tempo folder:
-
 ```bash
-npm run setup:statusline
+tempo setup
 ```
 
-The script adds the `statusLine` entry to `~/.claude/settings.json` without
-touching your other settings. If another statusline is already configured,
-it asks before replacing it, and sets it aside so that
-`npm run setup:statusline -- --remove` restores it. Use `-- --force` to
-replace it without asking (in a non-interactive shell, for instance).
-
-To do it by hand instead, add this entry to `~/.claude/settings.json`, using
-the absolute path to your clone:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "node /absolute/path/to/tempo/scripts/statusline.mjs"
-  }
-}
-```
-
-If the file already has other settings, add `statusLine` as a new top-level
-key next to them (mind the comma after the previous entry).
+It copies the statusline and the session summary to `~/.claude/tempo/bin/`
+and adds them to `~/.claude/settings.json` without touching your other
+settings or other tools' hooks. Both keep working if you move or delete the
+package. If another statusline is already configured, `tempo setup` asks
+before replacing it and sets it aside; `tempo setup --remove` restores it.
 
 Then send a message in any Claude Code session: the line appears at the
 bottom of the terminal, and the dashboard's gauges fill in on its next
 refresh. The figures only update while a Claude Code session is running;
 the dashboard shows when the last reading was taken.
-
-The script runs on its own, even when the Tempo server is stopped — but it
-lives in your clone, so moving or deleting the `tempo` folder breaks the
-statusline.
 
 ### Pace and projection
 
@@ -187,7 +201,7 @@ thresholds, or turn alerts off, set `TEMPO_ALERT_THRESHOLDS` in the
 statusline command:
 
 ```json
-"command": "TEMPO_ALERT_THRESHOLDS=70,90 node /absolute/path/to/tempo/scripts/statusline.mjs"
+"command": "TEMPO_ALERT_THRESHOLDS=70,90 node ~/.claude/tempo/bin/statusline.mjs"
 ```
 
 (`TEMPO_ALERT_THRESHOLDS=off` disables them.)
@@ -203,7 +217,7 @@ Opus 5.5 ◔ medium  ·  tempo ⎇ main ●  ·  ctx ▰▰▰▰▱▱▱▱ 52
 | `Opus 5.5 ◔ medium` | Model and effort level (`○` low → `●` max); `⚡` when fast mode is on |
 | `tempo ⎇ main ●` | Folder and git branch; `●` for uncommitted changes, `↑`/`↓` for commits ahead/behind the remote |
 | `ctx` | Context window used — turns yellow at 60 %, red at 80 % |
-| `5h` | 5-hour session used, and the time it resets (`at 20:00`) |
+| `5h` | 5-hour session used, and the time it resets (`at 20:00`); `· limit ~18:04` when the last hour's pace reaches the limit before the reset |
 | `7d` | Week used, and the time left until it resets (`in 3d14h10m`) |
 
 The words keep a reset *time* from being mistaken for a *duration*. In
@@ -369,7 +383,9 @@ of an unknown cap. For the actual percentage of your limits, see
 | `src/components/charts/` | Hand-written SVG charts |
 | `scripts/verify-pricing.ts` | Pricing verification against ground truth |
 | `scripts/statusline.mjs` | Claude Code statusline: saves usage limits, keeps their history, sends alerts |
-| `scripts/setup-statusline.mjs` | Installs or removes the statusline in Claude Code's settings |
+| `src/cli/` | The `tempo` command: start, status, doctor, setup, session summary |
+| `src/lib/git.ts` | Branch and PR links, read from the local git history only |
+| `scripts/build-cli.mjs` | Bundles the command into `dist/tempo.mjs`, with no dependencies |
 | `tests/` | Vitest suite |
 
 ## Configuration
@@ -381,7 +397,8 @@ of an unknown cap. For the actual percentage of your limits, see
 | `TEMPO_LIMITS_PATH` | `~/.claude/tempo/rate-limits.json` | Where usage limits are saved and read, history alongside (set it for both the statusline and the server) |
 | `TEMPO_ALERT_THRESHOLDS` | `80,95` | Statusline alert thresholds, in %, or `off` |
 | `TEMPO_LANG` | terminal language | Language of the statusline, alerts and setup script: `en`, `fr`, `es`, `de` |
-| `CLAUDE_SETTINGS_PATH` | `~/.claude/settings.json` | Settings file edited by `setup:statusline` |
+| `CLAUDE_SETTINGS_PATH` | `~/.claude/settings.json` | Settings file edited by `tempo setup` |
+| `TEMPO_SESSION_SUMMARY` | on | `off` hides the line printed when a session ends |
 
 ## Design notes
 

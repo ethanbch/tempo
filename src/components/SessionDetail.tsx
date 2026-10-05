@@ -100,10 +100,15 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
           <>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label={t.common.project} value={data.projectName} />
+              <Stat label={t.session.branch} value={data.gitBranch && data.gitBranch !== "HEAD" ? data.gitBranch : "—"} />
               <Stat label={t.common.cost} value={usd(data.cost)} />
               <Stat label={t.common.duration} value={duration(data.durationMs)} />
               <Stat label={t.common.requests} value={f.integer(data.requests.length)} />
+              <Stat label={t.session.peakContext} value={compactTokens(peakContext(data.requests))} />
+              <Stat label={t.session.rewrites} value={f.integer(rewrites(data.requests).length)} />
             </div>
+
+            <ContextChart requests={data.requests} />
 
             <ul className="mt-5 space-y-2">
               {data.requests.map((request, index) => (
@@ -133,6 +138,64 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Contexte envoyé par une requête : ce qui est relu, réécrit ou nouveau. */
+function contextOf(request: SessionRequest): number {
+  return request.inputTokens + request.cacheReadTokens + request.cacheWriteTokens;
+}
+
+function peakContext(requests: SessionRequest[]): number {
+  return requests.reduce((max, request) => Math.max(max, contextOf(request)), 0);
+}
+
+/** Les réécritures évitables : après une pause, un changement de modèle ou d'effort. */
+function rewrites(requests: SessionRequest[]): number[] {
+  return requests.flatMap((request, index) =>
+    request.cacheCause && request.cacheCause !== "context-growth" && request.cacheCause !== "session-start"
+      ? [index]
+      : [],
+  );
+}
+
+/**
+ * Le contexte requête après requête : il croît à chaque tour et retombe après
+ * une compaction. Les points jaunes marquent les réécritures évitables.
+ */
+function ContextChart({ requests }: { requests: SessionRequest[] }) {
+  const { t } = useI18n();
+  if (requests.length < 2) return null;
+
+  const peak = peakContext(requests) || 1;
+  const x = (index: number) => (index / (requests.length - 1)) * 1000;
+  const y = (value: number) => 100 - (value / peak) * 92;
+  const line = requests.map((request, index) => `${index ? "L" : "M"}${x(index)} ${y(contextOf(request))}`).join(" ");
+  const area = `${line} L1000 100 L0 100 Z`;
+
+  return (
+    <div className="mt-4">
+      <p className="eyebrow">{t.session.contextTitle}</p>
+      <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="mt-2 block h-20 w-full" aria-hidden>
+        <path d={area} fill="var(--accent)" opacity={0.12} />
+        <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        {rewrites(requests).map((index) => (
+          <line
+            key={index}
+            x1={x(index)}
+            x2={x(index)}
+            y1={y(contextOf(requests[index]))}
+            y2={100}
+            stroke="var(--status-warning)"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+      {rewrites(requests).length > 0 && (
+        <p className="mt-1 text-[12px] text-[var(--ink-muted)]">{t.session.contextLegend}</p>
+      )}
     </div>
   );
 }

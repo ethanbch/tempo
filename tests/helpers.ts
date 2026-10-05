@@ -27,6 +27,7 @@ export function makeEvent(
     sessionId: "session-1",
     projectId: "-Users-me-proj",
     projectName: "proj",
+    projectPath: "/Users/me/proj",
     gitBranch: null,
     isSidechain: false,
     cost: { input: 0, output: costTotal, cacheRead: 0, cacheWrite: 0, total: costTotal, estimated: false },

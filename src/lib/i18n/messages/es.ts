@@ -117,6 +117,12 @@ export const es: Messages = {
       empty: "Ningún nivel de esfuerzo registrado en este periodo.",
     },
     table: { title: "Detalle por día", subtitle: "Todos los valores de los gráficos, en texto." },
+    branches: {
+      title: "Por rama",
+      subtitle:
+        "Coste de las ramas de trabajo, sin main ni master. El enlace abre la PR cuando el historial git local la encuentra (fusión con commit de merge); si no, la rama. Sin llamadas de red.",
+      empty: "Ninguna rama de trabajo en este periodo.",
+    },
   },
 
   captions: {
@@ -127,6 +133,8 @@ export const es: Messages = {
       `${sessions} ${count === 1 ? "sesión" : "sesiones"} · ${requests} sol.`,
     requestsDuration: (requests, duration) => `${requests} sol. · ${duration}`,
     contextRewritten: "Contexto reescrito",
+    branch: (project, sessions, pr) =>
+      `${project}${pr ? ` · PR #${pr}` : ""} · ${sessions} ${sessions > 1 ? "sesiones" : "sesión"}`,
   },
 
   causes: {
@@ -160,6 +168,10 @@ export const es: Messages = {
     noPrevious: "sin actividad en el periodo anterior",
     avgPerDay: "Media por día activo",
     peakDay: "Día más costoso",
+  },
+
+  shortcuts: {
+    hint: "Atajos: 1–4 pestañas · t tema · / proyecto",
   },
 
   method: {
@@ -268,6 +280,11 @@ export const es: Messages = {
     output: (tokens) => `${tokens} de salida`,
     reread: (tokens) => `${tokens} releídos`,
     cacheRewritten: (cause) => `caché reescrita: ${cause}`,
+    branch: "Rama",
+    peakContext: "Contexto máx.",
+    rewrites: "Caché reescrita",
+    contextTitle: "Contexto releído por solicitud",
+    contextLegend: "Línea amarilla: caché reescrita tras una pausa, un cambio de modelo o de esfuerzo.",
   },
 
   table: {
@@ -301,6 +318,70 @@ export const es: Messages = {
     activeDays: (days) => ` · ${days} días activos`,
     privacy: (window) =>
       `Ningún dato sale de tu máquina: la aplicación lee archivos locales y no llama a ningún servicio remoto. Los indicadores de límite proceden de las lecturas que guarda la statusline de Claude Code. Duración de una ventana de cuota: ${window}.`,
+  },
+
+  cli: {
+    help: [
+      "Uso: tempo [comando]",
+      "",
+      "  tempo            Inicia el panel y lo abre en el navegador",
+      "  tempo status     Resumen en el terminal: límites, coste, rama",
+      "  tempo doctor     Comprueba la instalación",
+      "  tempo setup      Instala la statusline y el resumen de fin de sesión",
+      "  tempo setup --remove   Los desinstala",
+      "",
+      "Opciones de tempo: --port <n>, --no-open",
+    ],
+    noBuild: "El panel no está compilado. Ejecuta npm run build en la carpeta de Tempo.",
+    starting: "Iniciando Tempo…",
+    ready: (url) => `Tempo se ejecuta en ${url}`,
+    stop: "Ctrl+C para detenerlo.",
+    startFailed: "El servidor no arrancó. Prueba otro puerto con --port.",
+    setupHint: "Statusline no instalada: ejecuta tempo setup para ver tus límites.",
+    unknown: (command) => `Comando desconocido: ${command}`,
+    invalidJson: (file) => `${file} no es un JSON válido: corrígelo y vuelve a ejecutarlo.`,
+    yesNo: "(s/N)",
+    yes: "^(s|si|sí|y|yes)$",
+    existing: (current) => `Ya hay una statusline configurada:\n  ${current}`,
+    replace: "¿Sustituirla por la de Tempo?",
+    untouched: "No se ha cambiado nada. Vuelve a ejecutarlo con --force para sustituirla.",
+    setAside: (file) => `Guardada en ${file}, se restaura con --remove.`,
+    installed: (file) => `Statusline y resumen de fin de sesión instalados en ${file}.`,
+    nextMessage: "Aparecen con tu próximo mensaje en Claude Code.",
+    notInstalled: "No hay nada de Tempo instalado: nada que hacer.",
+    removedRestored: "Desinstalado. Se ha restaurado la statusline anterior.",
+    removed: "Desinstalado.",
+    session: "Sesión (5 h)",
+    week: "Semana",
+    today: "Hoy",
+    last7: "7 días",
+    branch: "Rama",
+    lever: "Palanca",
+    noLimits: "Sin lecturas de límites: ejecuta tempo setup y envía un mensaje en Claude Code.",
+    limitAt: (time) => `límite ~${time}`,
+    requests: (count) => `${count} sol.`,
+    avoidable: (amount) => `${amount} evitables`,
+    ok: "ok",
+    warn: "aviso",
+    missing: "falta",
+    doctorTitle: "tempo doctor",
+    node: (version) => `Node ${version}`,
+    nodeOld: (version) => `Node ${version}: Tempo necesita Node 20 o posterior`,
+    transcripts: (count, root) => `${count} transcripts en ${root}`,
+    noTranscripts: (root) => `Ningún transcript en ${root}: ejecuta una sesión de Claude Code`,
+    account: (plan) => `Cuenta Claude ${plan}`,
+    noAccount: "No se encontró ninguna cuenta de Claude en ~/.claude.json",
+    statusline: "Statusline instalada",
+    noStatusline: "Statusline no instalada: tempo setup",
+    hook: "Resumen de fin de sesión instalado",
+    noHook: "Resumen de fin de sesión no instalado: tempo setup",
+    reading: (ago) => `Última lectura de límites ${ago}`,
+    readingOld: (ago) => `Última lectura de límites ${ago}: envía un mensaje en Claude Code para actualizarla`,
+    noReading: "Sin lecturas de límites: envía un mensaje en Claude Code",
+    build: "Panel compilado",
+    noBuild2: "Panel no compilado: npm run build",
+    allGood: "Todo está en orden.",
+    toFix: (count) => `${count} punto${count > 1 ? "s" : ""} por corregir.`,
   },
 
   noTranscripts: {
