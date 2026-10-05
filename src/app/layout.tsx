@@ -31,7 +31,9 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    // Le script de thème modifie `data-theme` avant l'hydratation : l'écart avec
+    // le rendu serveur est voulu, on le signale à React.
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

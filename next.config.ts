@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
    * lors d'un déploiement serverless, sans objet pour une application qu'on
    * exécute sur sa propre machine. Rien à corriger ici.
    */
+
+  /*
+   * Masque le badge Next.js en bas de page en développement. Les erreurs de
+   * compilation et d'exécution restent affichées.
+   */
+  devIndicators: false,
 };
 
 export default nextConfig;
