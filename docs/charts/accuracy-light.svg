@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="272" viewBox="0 0 760 272" role="img" aria-label="Transcripts alone miss part of the cost">
+<rect width="760" height="272" rx="16" fill="#ffffff"/>
+<text x="24" y="40" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="600" fill="#1b1c1d">Transcripts alone miss part of the cost</text>
+<text x="24" y="64" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#504f4a">Share of Claude Code's own session total found in the logged requests</text>
+<text x="24" y="101.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="400" fill="#1b1c1d">Logged requests, worst session</text>
+<text x="24" y="117.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#6e6d67">titles, compaction, utility calls missing</text>
+<path d="M274,92 H450.8847457627119 Q454.8847457627119,92 454.8847457627119,96 V108 Q454.8847457627119,112 450.8847457627119,112 H274 Z" fill="#b9beff"/>
+<text x="464.8847457627119" y="107.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="400" fill="#504f4a">53.9 %</text>
+<text x="24" y="145.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="400" fill="#1b1c1d">Logged requests, median session</text>
+<text x="24" y="161.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#6e6d67">79 checkpoints, 48 transcripts</text>
+<path d="M274,136 H583.1084745762712 Q587.1084745762712,136 587.1084745762712,140 V152 Q587.1084745762712,156 583.1084745762712,156 H274 Z" fill="#b9beff"/>
+<text x="597.1084745762712" y="151.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="400" fill="#504f4a">93.3 %</text>
+<text x="24" y="189.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="600" fill="#1b1c1d">Tempo, closed sessions</text>
+<text x="24" y="205.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#6e6d67">calibrated on Claude Code's cost-state</text>
+<path d="M274,180 H605.5932203389831 Q609.5932203389831,180 609.5932203389831,184 V196 Q609.5932203389831,200 605.5932203389831,200 H274 Z" fill="#5b62e0"/>
+<text x="619.5932203389831" y="195.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="600" fill="#1b1c1d">100 %</text>
+<line x1="274" y1="84" x2="274" y2="208" stroke="#e6e5e1" stroke-width="1"/>
+<text x="24" y="250" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#6e6d67">Measured with npm run verify:pricing. Open sessions have no cost-state yet: their cost is a floor.</text>
+</svg>

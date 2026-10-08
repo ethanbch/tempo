@@ -3,44 +3,134 @@
 <img src="brand/svg/tempo-wordmark-on-light.svg#gh-light-mode-only" alt="tempo" height="56">
 <img src="brand/svg/tempo-wordmark-on-dark.svg#gh-dark-mode-only" alt="tempo" height="56">
 
-**A local dashboard for your Claude Code usage** — cost, tokens, cache
-efficiency, quota windows, and a breakdown by model and by project.
+### Know what your Claude Code sessions cost, and when you will hit your limits.
 
 [![CI](https://github.com/ethanbch/tempo/actions/workflows/ci.yml/badge.svg)](https://github.com/ethanbch/tempo/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/tempo-dashboard?color=4f56d6)](https://www.npmjs.com/package/tempo-dashboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![100% local](https://img.shields.io/badge/data-100%25%20local-brightgreen)](#100-local--no-data-ever-leaves-your-machine)
+[![100% local](https://img.shields.io/badge/data-100%25%20local-brightgreen)](#nothing-leaves-your-machine)
 
 </div>
 
 ---
 
-Built for **Claude Pro and Max** subscribers who want to know what their
-Claude Code sessions actually cost, without sending anything anywhere.
+A Claude Pro or Max subscription shows a usage bar, not what you used.
+Anthropic's usage and cost APIs are reserved for organizations, so the only
+record of your Claude Code usage is on your own disk: the transcripts Claude
+Code writes after every reply. **Tempo reads them** and turns them into a
+dashboard, a statusline and a one-line summary at the end of each session.
+
+```sh
+npx tempo-dashboard
+```
+
+Installs in 7 seconds, then opens in 1.5. `npx tempo-dashboard setup` adds
+the statusline and your session and weekly limits.
 
 ![Tempo's overview: session and weekly limits with their pace, API-equivalent cost against the previous period, cost per day, and the optimization teaser](docs/screenshot.png)
 
-The overview fits on one screen; three more tabs hold the detail:
-**Spend** (by model, project, session, git branch and effort level), **Activity** (limit
-history and projections, 5-hour windows, when you use Claude) and
-**Optimize** (levers and cache rebuilds). Explanations sit behind the ⓘ
-next to each title, and the calculation method behind "How it's computed".
-Keys `1` to `4` switch tabs, `t` the theme, `/` focuses the project filter.
+<table>
+<tr>
+<td align="center" width="25%"><h3>100 %</h3>of Claude Code's own total,<br>on every closed session</td>
+<td align="center" width="25%"><h3>12 ms</h3>to refresh the dashboard<br>when nothing changed</td>
+<td align="center" width="25%"><h3>50 ms</h3>per statusline refresh,<br>after each reply</td>
+<td align="center" width="25%"><h3>100 % local</h3>no account, no login,<br>no network call</td>
+</tr>
+</table>
 
-Per-branch cost links each working branch to its pull request when the local
-git history has its merge commit (`Merge pull request #12 from …`), otherwise
-to the branch itself. Tempo reads the local repository only; it calls neither
-GitHub nor any other service.
+## See where the cost goes
+
+The overview fits on one screen: your session and weekly limits with their
+pace, the API-equivalent cost against the previous period, and cost per day.
+Three tabs hold the detail:
+
+| Tab | What it answers |
+| --- | --- |
+| **Spend** | Which model, project, session, git branch and effort level cost the most |
+| **Activity** | How your limits evolved, when the next one will be hit, when you use Claude |
+| **Optimize** | What you can change: context repaid after a pause, cache invalidated mid-session, sessions grown too long |
+
+Each git branch links to its pull request when the local history has the
+merge commit. Tempo reads the local repository only; it calls neither GitHub
+nor any other service.
+
+## The cost is checked against Claude Code's own
+
+Each logged request carries its token counts, priced with the public API
+rates. That is not the whole bill: Claude Code also makes calls it never
+logs, such as session titles, context compaction and utility tasks. At the
+end of a session it writes its own total, and Tempo calibrates each session
+on it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/accuracy-dark.svg">
+  <img alt="Share of Claude Code's own session total found in the logged requests: 53.9 % in the worst session, 93.3 % in the median session; Tempo, calibrated on closed sessions, 100 %." src="docs/charts/accuracy-light.svg" width="760">
+</picture>
+
+| Cost source | Share of Claude Code's total |
+| --- | --- |
+| Logged requests, worst session | 53.9 % |
+| Logged requests, median session | 93.3 % |
+| **Tempo, closed sessions** (calibrated) | **100 %** |
+
+The rate card is verified the same way: `npm run verify:pricing` replays
+every session up to each of Claude Code's totals. Across 79 checkpoints in
+48 transcripts, no session comes out above Claude Code's figure, which is
+what a wrong rate or a double count would produce. A flat markup on the total
+was considered and left out: spreading each session's factor over its own
+requests keeps the charts, the filters and the total consistent.
+
+## Limits before you hit them
+
+The statusline saves the session and weekly percentages Claude Code receives
+from Anthropic, and the dashboard charts them from the opening of each
+window to its reset:
+
+- **Pace and projection.** At your pace over the last hour (session) or the
+  last 24 hours (week), Tempo says when you will hit the limit, or where you
+  will be at the reset.
+- **Estimated caps.** From your own history, "1 % ≈ $X" and the
+  API-equivalent cost of a full window. Anthropic does not publish these.
+- **Alerts** at 80 % and 95 %, as desktop notifications with the reset time,
+  once per window.
+
+## Fast, even with months of transcripts
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/speed-dark.svg">
+  <img alt="Milliseconds for 55 transcripts (185 MB): first read 416, statusline refresh 50, dashboard refresh with nothing changed 12." src="docs/charts/speed-light.svg" width="760">
+</picture>
+
+| Step | Time |
+| --- | --- |
+| First read of 55 transcripts (185 MB) | 416 ms |
+| Statusline refresh | 50 ms |
+| Dashboard refresh, nothing changed | 12 ms |
+| Open the dashboard, installed (`npx`) | 1.5 s |
+| Install from scratch (`npx`, empty cache) | 7.0 s |
+
+A refresh compares each file's size and modification time; a file that grew
+is read again from its last parsed byte only. The server uses about 236 MB
+of memory.
+
+## Nothing leaves your machine
+
+- Tempo reads the transcripts in `~/.claude/projects/`, your account details
+  in `~/.claude.json`, and the limits its statusline saves in
+  `~/.claude/tempo/`.
+- The dashboard runs on `127.0.0.1`. The only network traffic is your
+  browser talking to it.
+- No account, no login, no telemetry. Nothing is sent to Anthropic, to
+  Tempo's author, or to anyone else.
+
+Tempo only covers **Claude Code**: conversations on claude.ai leave no local
+trace.
 
 ## Table of contents
 
-- [Why Tempo](#why-tempo)
-- [100% local — no data ever leaves your machine](#100-local--no-data-ever-leaves-your-machine)
 - [Getting started](#getting-started)
-- [Languages](#languages)
 - [Command line](#command-line)
+- [Languages](#languages)
 - [Usage limit gauges and statusline](#usage-limit-gauges-and-statusline)
 - [What the cost number means](#what-the-cost-number-means)
 - [Refresh strategy](#refresh-strategy)
@@ -51,34 +141,6 @@ GitHub nor any other service.
 - [Design notes](#design-notes)
 - [Brand](#brand)
 - [License](#license)
-
-## Why Tempo
-
-There's no public "Sign in with Claude" OAuth for individual claude.ai
-accounts, and Anthropic's usage/cost APIs are reserved for organizations
-(Admin or Analytics keys) — a Pro or Max subscription doesn't grant access to
-them. The only real source of truth for an individual subscriber is local:
-the transcripts Claude Code already writes to disk. Tempo reads them and
-turns them into a dashboard.
-
-## 100% local — no data ever leaves your machine
-
-Tempo is a small Next.js app that runs on `localhost`. There is no login
-screen and no account to create:
-
-- It reads the transcripts Claude Code writes locally at
-  `~/.claude/projects/**/*.jsonl`.
-- It reads your account info from `~/.claude.json`, the config file Claude
-  Code itself maintains.
-- It reads your usage limits from `~/.claude/tempo/rate-limits.json`, a file
-  written by Tempo's statusline script (see
-  [below](#usage-limit-gauges-and-statusline)).
-- The only network request involved is your browser talking to the server
-  running on your own machine. Nothing is sent to Anthropic, to Tempo's
-  author, or to anyone else.
-
-This also means Tempo only covers **Claude Code** usage, not conversations on
-claude.ai, which leave no local trace.
 
 ## Getting started
 
@@ -243,9 +305,9 @@ complete on its own:
 2. **Calibration.** Claude Code also makes billed calls it never logs: title
    generation, context compaction, utility tasks. At the end of a session it
    does write a `cost-state` record that totals everything, though. The
-   ratio between the two gives a per-session factor — measured between 1.00
-   and 1.26 on real sessions, median 1.11 — applied pro rata to each visible
-   request.
+   ratio between the two gives a per-session factor — measured between 1.000
+   and 1.857 over 79 checkpoints, median 1.072 — applied pro rata to each
+   visible request.
 
 Distributing the factor rather than adding a flat markup keeps the charts
 consistent with the total, and keeps the period filter accurate. A session

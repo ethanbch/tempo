@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="272" viewBox="0 0 760 272" role="img" aria-label="Reads everything once, then only what changed">
+<rect width="760" height="272" rx="16" fill="#191a1c"/>
+<text x="24" y="40" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="17" font-weight="600" fill="#ecebe7">Reads everything once, then only what changed</text>
+<text x="24" y="64" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" fill="#b0afa9">Milliseconds, 55 transcripts (185 MB) on an M3 MacBook Air</text>
+<text x="24" y="101.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="400" fill="#ecebe7">First read of every transcript</text>
+<text x="24" y="117.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#8a8982">cold server, full parse</text>
+<path d="M274,92 H599.472 Q603.472,92 603.472,96 V108 Q603.472,112 599.472,112 H274 Z" fill="#747cf0"/>
+<text x="613.472" y="107.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="400" fill="#ecebe7">416 ms</text>
+<text x="24" y="145.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="400" fill="#ecebe7">Statusline refresh</text>
+<text x="24" y="161.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#8a8982">runs after each Claude Code reply</text>
+<path d="M274,136 H309.6 Q313.6,136 313.6,140 V152 Q313.6,156 309.6,156 H274 Z" fill="#747cf0"/>
+<text x="323.6" y="151.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="400" fill="#ecebe7">50 ms</text>
+<text x="24" y="189.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="400" fill="#ecebe7">Dashboard refresh</text>
+<text x="24" y="205.0" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#8a8982">nothing changed on disk: one stat per file</text>
+<path d="M274,180 H279.504 Q283.504,180 283.504,184 V196 Q283.504,200 279.504,200 H274 Z" fill="#747cf0"/>
+<text x="293.504" y="195.0" font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="13" font-weight="400" fill="#ecebe7">12 ms</text>
+<line x1="274" y1="84" x2="274" y2="208" stroke="#2a2b2e" stroke-width="1"/>
+<text x="24" y="250" font-family="IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11.5" fill="#8a8982">Changed files are re-read from their last parsed byte only.</text>
+</svg>
