@@ -20,6 +20,8 @@ export interface ModelPrice {
   cacheRead?: number;
   /** Tarif en mode rapide, quand le modèle le propose. */
   fast?: { input: number; output: number };
+  /** Tarif des requêtes dont le prompt (entrée + cache) dépasse `threshold` tokens. */
+  longPrompt?: { threshold: number; input: number; output: number };
 }
 
 const CACHE_WRITE_5M_MULTIPLIER = 1.25;
@@ -31,6 +33,7 @@ const PRICES: Record<string, ModelPrice> = {
   "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25 },
   "claude-mythos-5-1": { input: 10, output: 50, cacheRead: 0.25 },
   "claude-fable-5": { input: 10, output: 50 },
+  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, fast: { input: 8, output: 40 } },
   "claude-mythos-5": { input: 10, output: 50 },
   "claude-opus-5": { input: 5, output: 25, fast: { input: 10, output: 50 } },
   "claude-opus-4-8": { input: 5, output: 25, fast: { input: 10, output: 50 } },
@@ -39,11 +42,13 @@ const PRICES: Record<string, ModelPrice> = {
   "claude-opus-4-5": { input: 5, output: 25 },
   "claude-opus-4-1": { input: 15, output: 75 },
   "claude-opus-4": { input: 15, output: 75 },
+  "claude-sonnet-5-5": { input: 2, output: 10 },
   "claude-sonnet-5": { input: 2, output: 10 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
   "claude-sonnet-4-5": { input: 3, output: 15 },
   "claude-sonnet-4": { input: 3, output: 15 },
   "claude-3-7-sonnet": { input: 3, output: 15 },
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, longPrompt: { threshold: 100_000, input: 0.5, output: 2.5 } },
   "claude-haiku-4-5": { input: 1, output: 5 },
   "claude-3-5-haiku": { input: 0.8, output: 4 },
 };
@@ -124,7 +129,14 @@ export function computeCost(
   speed: Speed = "standard",
 ): CostBreakdown {
   const price = priceFor(model);
-  const rate = speed === "fast" && price.fast ? price.fast : price;
+  const promptTokens =
+    tokens.inputTokens + tokens.cacheReadTokens + tokens.cacheWrite5mTokens + tokens.cacheWrite1hTokens;
+  const rate =
+    speed === "fast" && price.fast
+      ? price.fast
+      : price.longPrompt && promptTokens > price.longPrompt.threshold
+        ? price.longPrompt
+        : price;
   const cacheReadRate = price.cacheRead ?? rate.input * CACHE_READ_MULTIPLIER;
 
   const perMillion = (count: number, usdPerMillion: number) =>
